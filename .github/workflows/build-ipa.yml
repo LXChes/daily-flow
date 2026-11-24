@@ -1,0 +1,141 @@
+name: Build IPA
+
+on:
+  push:
+    branches: ['**']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: build-ipa-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: macos-latest
+    timeout-minutes: 45
+    env:
+      XCODE_VERSION: "26.6"
+      XCODEGEN_VERSION: "2.48.0"
+    defaults:
+      run:
+        shell: bash -euo pipefail {0}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Select Xcode
+        run: |
+          XCODE_APP="/Applications/Xcode_${XCODE_VERSION}.app"
+          if [ ! -d "$XCODE_APP" ]; then
+            echo "::error::${XCODE_APP} not found on this runner image. Installed Xcode versions:"
+            ls /Applications | grep Xcode || true
+            exit 1
+          fi
+          sudo xcode-select -s "$XCODE_APP"
+          xcodebuild -version
+
+      - name: Install XcodeGen
+        run: |
+          curl -fsSL -o "$RUNNER_TEMP/xcodegen.zip" \
+            "https://github.com/yonaskolb/XcodeGen/releases/download/${XCODEGEN_VERSION}/xcodegen.zip"
+          unzip -q "$RUNNER_TEMP/xcodegen.zip" -d "$RUNNER_TEMP"
+          echo "$RUNNER_TEMP/xcodegen/bin" >> "$GITHUB_PATH"
+          "$RUNNER_TEMP/xcodegen/bin/xcodegen" --version
+
+      - name: Generate Xcode project
+        run: |
+          xcodegen --version
+          xcodegen generate --spec project.yml
+
+      - name: Archive (unsigned)
+        run: |
+          xcodebuild archive \
+            -project DailyFlow.xcodeproj \
+            -scheme DailyFlow \
+            -configuration Release \
+            -destination 'generic/platform=iOS' \
+            -archivePath "$RUNNER_TEMP/DailyFlow.xcarchive" \
+            -derivedDataPath "$RUNNER_TEMP/DerivedData" \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGN_IDENTITY="" \
+            CURRENT_PROJECT_VERSION="${{ github.run_number }}"
+
+      - name: Package IPA
+        run: |
+          APP="$RUNNER_TEMP/DailyFlow.xcarchive/Products/Applications/DailyFlow.app"
+          if [ ! -d "$APP" ]; then
+            echo "::error::DailyFlow.app missing from archive"
+            find "$RUNNER_TEMP/DailyFlow.xcarchive" -maxdepth 4 | head -50
+            exit 1
+          fi
+          if [ ! -d "$APP/PlugIns/DailyFlowWidget.appex" ]; then
+            echo "::error::DailyFlowWidget.appex is not embedded in DailyFlow.app/PlugIns"
+            ls -la "$APP" "$APP/PlugIns" || true
+            exit 1
+          fi
+          rm -rf "$RUNNER_TEMP/ipa"
+          mkdir -p "$RUNNER_TEMP/ipa/Payload"
+          cp -R "$APP" "$RUNNER_TEMP/ipa/Payload/"
+          cd "$RUNNER_TEMP/ipa"
+          zip -qry DailyFlow.ipa Payload
+          ls -lh DailyFlow.ipa
+          unzip -l DailyFlow.ipa | head -30
+
+      - name: Job summary
+        run: |
+          APP="$RUNNER_TEMP/DailyFlow.xcarchive/Products/Applications/DailyFlow.app"
+          VERSION="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' "$APP/Info.plist")"
+          BUILD="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleVersion' "$APP/Info.plist")"
+          SIZE="$(ls -lh "$RUNNER_TEMP/ipa/DailyFlow.ipa" | awk '{print $5}')"
+          {
+            echo "## Daily Flow IPA"
+            echo ""
+            echo "- Version: ${VERSION}"
+            echo "- Build number: ${BUILD}"
+            echo "- IPA size: ${SIZE}"
+            echo "- Commit: ${GITHUB_SHA::7}"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload IPA artifact
+        uses: actions/upload-artifact@v7
+        with:
+          name: DailyFlow-ipa-${{ github.run_number }}
+          path: ${{ runner.temp }}/ipa/DailyFlow.ipa
+          if-no-files-found: error
+          retention-days: 30
+
+  release:
+    needs: build
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    defaults:
+      run:
+        shell: bash -euo pipefail {0}
+    steps:
+      - name: Download IPA artifact
+        uses: actions/download-artifact@v8
+        with:
+          name: DailyFlow-ipa-${{ github.run_number }}
+          path: ipa
+
+      - name: Replace latest release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          RUN_NUMBER: ${{ github.run_number }}
+          SHA: ${{ github.sha }}
+        run: |
+          test -f ipa/DailyFlow.ipa
+          gh release delete latest --cleanup-tag --yes || true
+          gh release create latest ipa/DailyFlow.ipa \
+            --title "Daily Flow (latest build)" \
+            --notes "Unsigned IPA for sideloading. Build ${RUN_NUMBER}, commit ${SHA::7}." \
+            --target "$SHA" \
+            --latest
