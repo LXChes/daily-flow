@@ -66,7 +66,19 @@ jobs:
             CODE_SIGNING_ALLOWED=NO \
             CODE_SIGNING_REQUIRED=NO \
             CODE_SIGN_IDENTITY="" \
-            CURRENT_PROJECT_VERSION="${{ github.run_number }}"
+            CURRENT_PROJECT_VERSION="${{ github.run_number }}" \
+            2>&1 | tee "$RUNNER_TEMP/archive.log"
+
+      - name: Fail on build warnings
+        run: |
+          # SWIFT_TREAT_WARNINGS_AS_ERRORS covers Swift only; this also catches Xcode tool,
+          # asset catalog and Info.plist validation warnings (quality gate: zero warnings).
+          if grep -E "warning: " "$RUNNER_TEMP/archive.log" | sort -u > "$RUNNER_TEMP/warnings.txt"; then
+            while IFS= read -r line; do echo "::warning::${line}"; done < "$RUNNER_TEMP/warnings.txt"
+            echo "::error::Build produced $(wc -l < "$RUNNER_TEMP/warnings.txt" | tr -d ' ') warning(s)."
+            exit 1
+          fi
+          echo "No build warnings."
 
       - name: Package IPA
         run: |
