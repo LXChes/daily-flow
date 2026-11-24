@@ -68,7 +68,8 @@ A milestone is done only when the gate passes **and** the GitHub Actions build i
 
 - `project.yml` (XcodeGen) is the source of truth. The `.xcodeproj` is generated in CI and never committed.
 - `.github/workflows/build-ipa.yml`:
-  - Runs on `macos-latest` with **Xcode 26.6** and **XcodeGen 2.48.0**, both pinned.
+  - Runs on `macos-26-intel` with **Xcode 26.6** and **XcodeGen 2.48.0**, both pinned. (`macos-latest`
+    is arm64 and kept going unassigned because of GitHub capacity limits. Move back when that recovers.)
   - Archives unsigned (`CODE_SIGNING_ALLOWED=NO`) and zips `Payload/DailyFlow.app` into `DailyFlow.ipa`.
   - Uploads the IPA as an Actions artifact for every branch. Pushes to `main` also replace the rolling `latest` GitHub Release.
 - No local Mac, so the CI run is the compiler. After pushing, read the run logs and fix any failure.

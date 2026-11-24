@@ -14,7 +14,11 @@ concurrency:
 
 jobs:
   build:
-    runs-on: macos-latest
+    # macos-latest (macOS 26 arm64) jobs were cancelled unstarted ("not acquired by Runner",
+    # GitHub arm64 capacity constraints). macos-26-intel is the same macOS 26 image family with the
+    # same pinned Xcode 26.6 and is a standard runner (free on public repos). Switch back to
+    # macos-latest once arm64 capacity recovers.
+    runs-on: macos-26-intel
     timeout-minutes: 45
     env:
       XCODE_VERSION: "26.6"
