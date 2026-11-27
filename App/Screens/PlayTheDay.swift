@@ -163,6 +163,12 @@ private struct ConveyorBelt: View {
             let offset = width / 2 - CGFloat(minute - range.lowerBound) * pointsPerMinute
 
             ZStack(alignment: .topLeading) {
+                Rectangle()
+                    .fill(LinearGradient(colors: [.clear, palette.ink, .clear], startPoint: .top, endPoint: .bottom))
+                    .frame(width: 2, height: 142)
+                    .position(x: width / 2, y: 77)
+                    .allowsHitTesting(false)
+
                 BeltTrack(
                     items: model.timedItems,
                     range: range,
@@ -172,14 +178,19 @@ private struct ConveyorBelt: View {
                 .frame(width: trackWidth, height: BeltLayout.trackHeight, alignment: .topLeading)
                 .offset(x: offset)
                 .frame(width: width, height: BeltLayout.trackHeight, alignment: .topLeading)
-                .rotation3DEffect(.degrees(34), axis: (x: 1, y: 0, z: 0), anchor: .bottom, perspective: 0.4)
+                .mask(
+                    // Fades the far edge so the belt visibly recedes.
+                    LinearGradient(
+                        stops: [
+                            .init(color: .black.opacity(0.2), location: 0),
+                            .init(color: .black, location: 0.55)
+                        ],
+                        startPoint: .top,
+                        endPoint: .bottom
+                    )
+                )
+                .rotation3DEffect(.degrees(40), axis: (x: 1, y: 0, z: 0), anchor: .bottom, perspective: 0.9)
                 .padding(.top, 18)
-
-                Rectangle()
-                    .fill(LinearGradient(colors: [.clear, palette.ink, .clear], startPoint: .top, endPoint: .bottom))
-                    .frame(width: 2, height: 142)
-                    .position(x: width / 2, y: 77)
-                    .allowsHitTesting(false)
 
                 Text("Drag the belt or press play. Blocks are as long as the task.")
                     .dfStyle(.micro)

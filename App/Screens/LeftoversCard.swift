@@ -22,10 +22,11 @@ struct LeftoversCard: View {
                         .dfStyle(.cardTitle)
                         .foregroundStyle(palette.ink)
                         .multilineTextAlignment(.leading)
-                    Text("Keep, push to tomorrow or bin \u{00B7} morning brief")
+                    Text("Keep, push to tomorrow or bin")
                         .dfStyle(.caption)
                         .foregroundStyle(palette.inkSecondary)
-                        .multilineTextAlignment(.leading)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.85)
                 }
                 Spacer(minLength: 8)
                 Image(systemName: "chevron.right")

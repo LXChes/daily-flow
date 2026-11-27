@@ -25,7 +25,7 @@ struct ClockText: View {
         HStack(spacing: 0) {
             ForEach(Array(text.enumerated()), id: \.offset) { _, character in
                 Text(String(character))
-                    .frame(width: character == ":" ? size * 0.34 : size * 0.72)
+                    .frame(width: character == ":" ? size * 0.3 : size * 0.62)
             }
         }
         .font(DFTextStyle.clock.font(fixedSize: size))

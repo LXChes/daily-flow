@@ -115,7 +115,8 @@ private struct ViewSwitcherCard: View {
                 ChipGroup(
                     values: PreviewMode.allCases,
                     label: { model.previewLabel($0) },
-                    selection: model.preview
+                    selection: model.preview,
+                    stacked: true
                 ) { value in
                     model.setPreview(value)
                 }

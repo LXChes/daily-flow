@@ -307,6 +307,9 @@ private struct AddNoticeForm: View {
                 DatePicker("Date", selection: $date, displayedComponents: .date)
                     .labelsHidden()
                     .tint(palette.accent)
+                    .environment(\.locale, Locale(identifier: "en_GB"))
+                    .environment(\.calendar, model.clock.calendar)
+                    .environment(\.timeZone, model.clock.calendar.timeZone)
                 Spacer(minLength: 0)
                 Button {
                     withAnimation(model.animated(Motion.settle)) {
@@ -328,6 +331,9 @@ private struct AddNoticeForm: View {
             AccentButton(title: "Add notice day", isEnabled: !trimmed.isEmpty, action: add)
         }
         .padding(.vertical, 12)
+        .onAppear {
+            date = model.today.startDate(in: model.clock.calendar)
+        }
     }
 
     private func add() {

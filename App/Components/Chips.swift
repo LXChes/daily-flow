@@ -17,6 +17,8 @@ struct ChoiceChip: View {
     let isSelected: Bool
     let namespace: Namespace.ID
     var style: Style = .pill
+    /// Fill the width the parent offers (equal-width segments).
+    var fillsWidth = false
     let action: () -> Void
 
     private var corner: CGFloat { style == .track ? 11 : 12 }
@@ -31,7 +33,7 @@ struct ChoiceChip: View {
                 .lineLimit(1)
                 .minimumScaleFactor(0.8)
                 .padding(.horizontal, 14)
-                .frame(minHeight: Metrics.hit)
+                .frame(maxWidth: fillsWidth ? .infinity : nil, minHeight: Metrics.hit)
                 .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
@@ -66,8 +68,11 @@ struct ChipGroup<Value: Hashable>: View {
     let options: [Option]
     let selection: Value?
     let onSelect: (Value) -> Void
+    /// One full-width option per line instead of equal segments side by side.
+    var stacked = false
 
-    init(options: [Option], selection: Value?, onSelect: @escaping (Value) -> Void) {
+    init(options: [Option], selection: Value?, stacked: Bool = false, onSelect: @escaping (Value) -> Void) {
+        self.stacked = stacked
         self.options = options
         self.selection = selection
         self.onSelect = onSelect
@@ -78,26 +83,34 @@ struct ChipGroup<Value: Hashable>: View {
         values: [Value],
         label: (Value) -> String,
         selection: Value?,
+        stacked: Bool = false,
         onSelect: @escaping (Value) -> Void
     ) {
         self.init(
             options: values.map { Option(value: $0, label: label($0)) },
             selection: selection,
+            stacked: stacked,
             onSelect: onSelect
         )
     }
 
     var body: some View {
-        FlowLayout(spacing: 4, lineSpacing: 4, justified: true) {
-            ForEach(options) { option in
-                ChoiceChip(
-                    label: option.label,
-                    isSelected: option.value == selection,
-                    namespace: namespace,
-                    style: .track
-                ) {
-                    onSelect(option.value)
-                }
+        let chips = ForEach(options) { option in
+            ChoiceChip(
+                label: option.label,
+                isSelected: option.value == selection,
+                namespace: namespace,
+                style: .track,
+                fillsWidth: true
+            ) {
+                onSelect(option.value)
+            }
+        }
+        Group {
+            if stacked {
+                VStack(spacing: 4) { chips }
+            } else {
+                HStack(spacing: 4) { chips }
             }
         }
         .padding(4)

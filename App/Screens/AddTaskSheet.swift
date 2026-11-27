@@ -240,6 +240,9 @@ struct AddTaskSheet: View {
                     displayedComponents: .date
                 )
                 .datePickerStyle(.graphical)
+                .environment(\.locale, Locale(identifier: "en_GB"))
+                .environment(\.calendar, model.clock.calendar)
+                .environment(\.timeZone, model.clock.calendar.timeZone)
                 .labelsHidden()
                 .tint(palette.accent)
                 .padding(8)
