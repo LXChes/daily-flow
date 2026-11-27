@@ -233,10 +233,11 @@ private struct BeltTrack: View {
         let hours = Array(stride(from: Int(range.lowerBound), through: Int(range.upperBound), by: 60))
 
         ZStack(alignment: .topLeading) {
+            // The belt's polished rail.
             Rectangle()
-                .fill(palette.tickLine)
-                .frame(height: 2)
-                .offset(y: 100)
+                .fill(palette.chrome)
+                .frame(height: 3)
+                .offset(y: 99)
 
             ForEach(hours, id: \.self) { minute in
                 let x = CGFloat(Double(minute) - range.lowerBound) * ppm
@@ -283,8 +284,8 @@ private struct BeltBlock: View {
                     .dfStyle(.cardTitle)
                     .strikethrough(item.isDone)
                     .lineLimit(2)
-                    .minimumScaleFactor(0.8)
-                    .padding(.trailing, 30)
+                    .minimumScaleFactor(0.65)
+                    .padding(.trailing, 28)
                 Spacer(minLength: 0)
                 Text(item.spanText)
                     .dfStyle(.micro)

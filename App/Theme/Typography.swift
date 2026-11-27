@@ -21,6 +21,20 @@ enum FontRegistry {
         )
     }()
 
+    /// True when asking CoreText for a heavier weight really changes the Syne glyph widths, which is how
+    /// SwiftUI's `.weight` reaches a variable font. If it does not, text styles set the `wght` axis
+    /// directly instead, so headings are never left in the thin default weight.
+    static let weightTraitWorks: Bool = {
+        guard availability.syne else { return true }
+        func width(of weight: UIFont.Weight) -> CGFloat {
+            let base = UIFontDescriptor(fontAttributes: [.family: "Syne"])
+            let descriptor = base.addingAttributes([.traits: [UIFontDescriptor.TraitKey.weight: weight.rawValue]])
+            let font = UIFont(descriptor: descriptor, size: 40)
+            return ("DAILY" as NSString).size(withAttributes: [.font: font]).width
+        }
+        return abs(width(of: .heavy) - width(of: .regular)) > 2
+    }()
+
     private static func register(_ name: String) {
         let url = Bundle.main.url(forResource: name, withExtension: "ttf")
             ?? Bundle.main.url(forResource: name, withExtension: "ttf", subdirectory: "Fonts")
@@ -52,30 +66,73 @@ struct DFTextStyle: @unchecked Sendable {
     var tracking: CGFloat = 0
 
     var font: Font {
-        let available = FontRegistry.availability
-        switch family {
-        case .syne where available.syne:
-            return .custom("Syne", size: size, relativeTo: relativeTo).weight(weight)
-        case .inter where available.inter:
-            return .custom("Inter", size: size, relativeTo: relativeTo).weight(weight)
-        case .syne:
-            return .system(relativeTo, design: .default).weight(weight)
-        case .inter:
-            return .system(relativeTo, design: .default).weight(weight)
+        guard let name = familyName else { return fallbackFont }
+        if FontRegistry.weightTraitWorks {
+            return .custom(name, size: size, relativeTo: relativeTo).weight(weight)
         }
+        return Font(variationFont(name, scaled: true) as CTFont)
     }
 
     /// A fixed-size version, for numerals scaled with `@ScaledMetric` so the layout can cap their growth.
     func font(fixedSize points: CGFloat) -> Font {
+        guard let name = familyName else { return .system(size: points, weight: weight, design: .default) }
+        if FontRegistry.weightTraitWorks {
+            return .custom(name, fixedSize: points).weight(weight)
+        }
+        return Font(variationFont(name, scaled: false, size: points) as CTFont)
+    }
+
+    /// The family to ask for, or nil when its file did not register.
+    private var familyName: String? {
         let available = FontRegistry.availability
         switch family {
-        case .syne where available.syne:
-            return .custom("Syne", fixedSize: points).weight(weight)
-        case .inter where available.inter:
-            return .custom("Inter", fixedSize: points).weight(weight)
-        default:
-            return .system(size: points, weight: weight, design: .default)
+        case .syne: return available.syne ? "Syne" : nil
+        case .inter: return available.inter ? "Inter" : nil
         }
+    }
+
+    private var fallbackFont: Font {
+        .system(relativeTo, design: .default).weight(weight)
+    }
+
+    /// The numeric `wght` axis value for the weight.
+    private var axisValue: Double {
+        switch weight {
+        case .black: return 900
+        case .heavy: return 800
+        case .bold: return 700
+        case .semibold: return 600
+        case .medium: return 500
+        case .light: return 300
+        default: return 400
+        }
+    }
+
+    private var uiTextStyle: UIFont.TextStyle {
+        switch relativeTo {
+        case .largeTitle: return .largeTitle
+        case .title: return .title1
+        case .title2: return .title2
+        case .title3: return .title3
+        case .headline: return .headline
+        case .subheadline: return .subheadline
+        case .callout: return .callout
+        case .footnote: return .footnote
+        case .caption: return .caption1
+        case .caption2: return .caption2
+        default: return .body
+        }
+    }
+
+    /// A font with the `wght` axis set explicitly, optionally scaled with Dynamic Type.
+    private func variationFont(_ name: String, scaled: Bool, size override: CGFloat? = nil) -> UIFont {
+        let weightAxis = NSNumber(value: 2_003_265_652) // 'wght'
+        let descriptor = UIFontDescriptor(fontAttributes: [
+            .family: name,
+            UIFontDescriptor.AttributeName(rawValue: kCTFontVariationAttribute as String): [weightAxis: NSNumber(value: axisValue)]
+        ])
+        let base = UIFont(descriptor: descriptor, size: override ?? size)
+        return scaled ? UIFontMetrics(forTextStyle: uiTextStyle).scaledFont(for: base) : base
     }
 }
 
