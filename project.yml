@@ -43,6 +43,8 @@ targets:
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
         ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME: AccentColor
     dependencies:
+      - target: DailyFlowCore
+        embed: true
       - target: DailyFlowWidget
         embed: true
       - sdk: AppIntents.framework
@@ -81,12 +83,49 @@ targets:
         ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME: AccentColor
         ASSETCATALOG_COMPILER_WIDGET_BACKGROUND_COLOR_NAME: WidgetBackground
 
+  # Shared engine: SwiftData models, day rollover, notice days, snapshot. Embedded in the app;
+  # the widget links it in M4. Extension-safe so it can be linked from the widget.
+  DailyFlowCore:
+    type: framework
+    platform: iOS
+    sources:
+      - path: Core
+    dependencies:
+      - sdk: AppIntents.framework
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.example.dailyflow.core
+        PRODUCT_NAME: DailyFlowCore
+        GENERATE_INFOPLIST_FILE: YES
+        APPLICATION_EXTENSION_API_ONLY: YES
+        DEFINES_MODULE: YES
+        SKIP_INSTALL: YES
+
+  # Unit tests for the engine. No host app: they run straight against the framework.
+  DailyFlowCoreTests:
+    type: bundle.unit-test
+    platform: iOS
+    sources:
+      - path: CoreTests
+    dependencies:
+      - target: DailyFlowCore
+      - sdk: AppIntents.framework
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.example.dailyflow.tests
+        GENERATE_INFOPLIST_FILE: YES
+
 schemes:
   DailyFlow:
     build:
       targets:
         DailyFlow: all
+        DailyFlowCoreTests: [test]
     run:
       config: Debug
+    test:
+      config: Debug
+      targets:
+        - DailyFlowCoreTests
     archive:
       config: Release

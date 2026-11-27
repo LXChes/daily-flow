@@ -17,4 +17,7 @@ The IPA is unsigned and is intended for sideloading.
 
 ## Status
 
-Milestone M1 (pipeline proof): a placeholder app and widget that prove the build and packaging pipeline.
+- M1 (pipeline proof): done.
+- M2 (core engine): `Core/` is the `DailyFlowCore` framework (SwiftData models, day rollover and
+  leftovers triage, computed notice days, settings, widget snapshot). `CoreTests/` holds its unit tests,
+  which CI runs on an iOS simulator after packaging the IPA.

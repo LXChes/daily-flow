@@ -88,6 +88,11 @@ jobs:
             find "$RUNNER_TEMP/DailyFlow.xcarchive" -maxdepth 4 | head -50
             exit 1
           fi
+          if [ ! -d "$APP/Frameworks/DailyFlowCore.framework" ]; then
+            echo "::error::DailyFlowCore.framework is not embedded in DailyFlow.app/Frameworks"
+            ls -la "$APP" "$APP/Frameworks" || true
+            exit 1
+          fi
           if [ ! -d "$APP/PlugIns/DailyFlowWidget.appex" ]; then
             echo "::error::DailyFlowWidget.appex is not embedded in DailyFlow.app/PlugIns"
             ls -la "$APP" "$APP/PlugIns" || true
@@ -123,6 +128,69 @@ jobs:
           path: ${{ runner.temp }}/ipa/DailyFlow.ipa
           if-no-files-found: error
           retention-days: 30
+
+      # Tests run after the IPA upload, so a simulator problem never blocks the download, but any
+      # failure still fails this job, which stops the main-branch Release.
+      - name: Pick iOS simulator
+        id: simulator
+        run: |
+          xcrun simctl list runtimes available
+          UDID="$(xcrun simctl list devices available --json | jq -r '
+            [.devices | to_entries | sort_by(.key)[] | select(.key | contains("iOS"))
+              | .value[] | select(.name | startswith("iPhone"))] | last | .udid // empty')"
+          if [ -z "$UDID" ]; then
+            echo "::error::No available iPhone simulator on this runner image."
+            xcrun simctl list devices available
+            exit 1
+          fi
+          xcrun simctl list devices available | grep "$UDID"
+          echo "udid=$UDID" >> "$GITHUB_OUTPUT"
+
+      - name: Unit tests (iOS simulator)
+        run: |
+          xcodebuild test \
+            -project DailyFlow.xcodeproj \
+            -scheme DailyFlow \
+            -configuration Debug \
+            -destination "id=${{ steps.simulator.outputs.udid }}" \
+            -derivedDataPath "$RUNNER_TEMP/TestDerivedData" \
+            -resultBundlePath "$RUNNER_TEMP/Tests.xcresult" \
+            CODE_SIGNING_ALLOWED=NO \
+            2>&1 | tee "$RUNNER_TEMP/test.log"
+
+      - name: Fail on test build warnings
+        run: |
+          if grep -E "warning: " "$RUNNER_TEMP/test.log" | sort -u > "$RUNNER_TEMP/test-warnings.txt"; then
+            while IFS= read -r line; do echo "::warning::${line}"; done < "$RUNNER_TEMP/test-warnings.txt"
+            echo "::error::Test build produced $(wc -l < "$RUNNER_TEMP/test-warnings.txt" | tr -d ' ') warning(s)."
+            exit 1
+          fi
+          echo "No test build warnings."
+
+      - name: Test summary
+        if: always() && steps.simulator.outcome == 'success'
+        run: |
+          {
+            echo "## Unit tests"
+            echo ""
+            if grep -qE "\*\* TEST SUCCEEDED \*\*" "$RUNNER_TEMP/test.log" 2>/dev/null; then
+              echo "- Result: passed"
+            else
+              echo "- Result: FAILED (see the test-log artifact)"
+            fi
+            grep -E "Test run with [0-9]+ tests" "$RUNNER_TEMP/test.log" | tail -1 | sed 's/^/- /' || true
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload test log
+        if: always() && steps.simulator.outcome == 'success'
+        uses: actions/upload-artifact@v7
+        with:
+          name: test-log-${{ github.run_number }}
+          path: |
+            ${{ runner.temp }}/test.log
+            ${{ runner.temp }}/Tests.xcresult
+          if-no-files-found: warn
+          retention-days: 14
 
   release:
     needs: build

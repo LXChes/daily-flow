@@ -1,6 +1,9 @@
 import SwiftUI
 
 struct ContentView: View {
+    /// True when the on-device store could not open and changes will not be kept.
+    var isTemporaryStore = false
+
     private var versionText: String {
         let info = Bundle.main.infoDictionary
         let version = info?["CFBundleShortVersionString"] as? String ?? "?"
@@ -30,7 +33,7 @@ struct ContentView: View {
                     .tracking(8)
                     .foregroundStyle(chrome)
 
-                Text("Pipeline proof · M1")
+                Text(isTemporaryStore ? "Temporary storage · changes not saved" : "Core engine · M2")
                     .font(.footnote)
                     .tracking(2)
                     .foregroundStyle(.secondary)
