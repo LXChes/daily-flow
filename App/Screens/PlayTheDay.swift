@@ -5,6 +5,7 @@ import SwiftUI
 /// day is playing and gently otherwise. Only the views inside it re-draw per frame.
 struct PlayheadReader<Content: View>: View {
     @Environment(AppModel.self) private var model
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     private let content: (Double) -> Content
 
     init(@ViewBuilder content: @escaping (Double) -> Content) {
@@ -14,7 +15,9 @@ struct PlayheadReader<Content: View>: View {
     var body: some View {
         let mode = model.playhead.mode
         let range = model.beltRange
-        TimelineView(.animation(minimumInterval: mode.isPlaying ? nil : 2)) { context in
+        // With Reduce Motion the playing day steps twice a second instead of gliding every frame.
+        let interval: Double? = mode.isPlaying ? (reduceMotion ? 0.5 : nil) : 2
+        TimelineView(.animation(minimumInterval: interval)) { context in
             content(Playhead.minute(mode: mode, at: context.date, live: { model.liveMinute }, range: range))
         }
     }
