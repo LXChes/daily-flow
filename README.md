@@ -21,3 +21,6 @@ The IPA is unsigned and is intended for sideloading.
 - M2 (core engine): `Core/` is the `DailyFlowCore` framework (SwiftData models, day rollover and
   leftovers triage, computed notice days, settings, widget snapshot). `CoreTests/` holds its unit tests,
   which CI runs on an iOS simulator after packaging the IPA.
+- M3 (main app UI): `App/` holds the SwiftUI app: the Conveyor "Play the day" belt, list view, leftovers
+  triage, notice banner, four progress styles, add sheet, view switcher, settings, dark and light themes.
+  CI also launches a demo build in the simulator and uploads screenshots of each screen.

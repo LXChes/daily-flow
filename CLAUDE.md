@@ -9,7 +9,7 @@ for free (Phase 3, SideStore, is handled elsewhere: never do it here).
 
 ## Current milestone
 
-**M1 Pipeline proof and M2 Core engine: done (cloud build green). M3 Main app UI: current.** Do one milestone at a time, then stop and
+**M1 Pipeline proof, M2 Core engine and M3 Main app UI: done (cloud build green). M4 Notifications + widgets: next, waiting for the owner's go-ahead.** Do one milestone at a time, then stop and
 report to the owner in plain English. Never start the next milestone without the owner's go-ahead.
 
 | # | Milestone | Scope |
@@ -27,6 +27,7 @@ report to the owner in plain English. Never start the next milestone without the
 - CI is the compiler and the warning checker. It fails on any compile error or warning. Read the logs after every push and fix failures. Do not re-check by eye what CI already checks.
 - Test pure logic. Date, rollover and notice-day logic is pure and injectable, with unit tests run in CI.
 - See the UI, don't score it blind (M3, M5). Try having CI launch the app in the iOS simulator, take screenshots and upload them as an artifact, then download and look at them. Untested idea: if it is unreliable on the runner, say so and fall back to asking the owner to check on device.
+- CI screenshots: the `screenshots-<run>` artifact holds 13 demo scenes. Download with `gh run download <id> -n screenshots-<n>`; the session environment must allow GitHub's `productionresultssaN.blob.core.windows.net` storage host for that run.
 - Runner: CI uses macos-26-intel. macos-latest (arm64) had capacity problems. Switch back only if it recovers.
 - Explain simply. The owner is not a developer. After any jargon-heavy explanation, add a plain-English version.
 - One milestone at a time. Confirm understanding first, do only the named milestone, then stop and report in plain English: what was pushed, where to check the build in the Actions tab, how to download the IPA.
