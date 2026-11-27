@@ -89,6 +89,12 @@ public struct NoticeOccurrence: Hashable, Sendable, Identifiable {
     public var title: String { rule.title }
 }
 
+/// The view switcher's "Preview a notice day" choice: see the app as it will look on an upcoming notice.
+/// Temporary, so it is never stored.
+public enum PreviewMode: String, CaseIterable, Codable, Sendable {
+    case normal, nextNotice, noticeAfter
+}
+
 /// Pure notice-day lookups. Pass the rules that are switched on; the engine never reads storage.
 public enum NoticeCalendar {
     /// Every built-in notice, in calendar order.
@@ -100,6 +106,17 @@ public enum NoticeCalendar {
     public static func notices(on day: CalendarDay, rules: [NoticeRule]) -> [NoticeOccurrence] {
         rules.compactMap { rule in
             rule.schedule.occurrence(in: day.year) == day ? NoticeOccurrence(rule: rule, day: day) : nil
+        }
+    }
+
+    /// The notice to preview: the next one after `today`, or the one after that. `nil` for `.normal`
+    /// or when nothing is coming up within a year.
+    public static func preview(_ mode: PreviewMode, after today: CalendarDay, rules: [NoticeRule]) -> NoticeOccurrence? {
+        let coming = upcoming(from: today.adding(days: 1), days: 366, rules: rules)
+        switch mode {
+        case .normal: return nil
+        case .nextNotice: return coming.first
+        case .noticeAfter: return coming.dropFirst().first
         }
     }
 

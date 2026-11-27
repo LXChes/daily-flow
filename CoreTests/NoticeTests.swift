@@ -70,6 +70,16 @@ struct NoticeTests {
         #expect(rule.schedule.occurrence(in: 2031) == nil)
     }
 
+    @Test func previewPicksTheNextNoticesAfterToday() {
+        let rules = NoticeCalendar.builtInRules
+        // On Christmas Day itself, "next" skips today.
+        let christmas = Fixture.day(20301225)
+        #expect(NoticeCalendar.preview(.normal, after: christmas, rules: rules) == nil)
+        #expect(NoticeCalendar.preview(.nextNotice, after: christmas, rules: rules)?.title == "New Year's Eve")
+        #expect(NoticeCalendar.preview(.noticeAfter, after: christmas, rules: rules)?.title == "New Year's Day")
+        #expect(NoticeCalendar.preview(.nextNotice, after: christmas, rules: []) == nil)
+    }
+
     @Test func upcomingCrossesTheYearInOrder() {
         let custom = NoticeRule(id: "custom.party", title: "Board games", schedule: .everyYear(month: 12, day: 25))
         let found = NoticeCalendar.upcoming(

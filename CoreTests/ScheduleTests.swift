@@ -41,12 +41,11 @@ struct ScheduleTests {
         #expect(DaySchedule.upcoming(finished, afterMinute: 0).map(\.name) == ["Gym", "Seminar"])
     }
 
-    @Test func featuredFollowsPreviewMode() {
-        #expect(DaySchedule.featured(items, atMinute: 610, mode: .normal)?.name == "Lecture")
-        #expect(DaySchedule.featured(items, atMinute: 610, mode: .nextEvent)?.name == "Seminar")
-        #expect(DaySchedule.featured(items, atMinute: 300, mode: .theOneAfter)?.name == "Lecture")
-        #expect(DaySchedule.featured(items, atMinute: 700, mode: .normal)?.name == "Seminar")
-        #expect(DaySchedule.featured(items, atMinute: 900, mode: .normal) == nil)
+    @Test func nowOrNextFeaturesTheRunningTaskElseTheNextOne() {
+        #expect(DaySchedule.nowOrNext(items, atMinute: 610)?.name == "Lecture")
+        #expect(DaySchedule.nowOrNext(items, atMinute: 300)?.name == "Gym")
+        #expect(DaySchedule.nowOrNext(items, atMinute: 700)?.name == "Seminar")
+        #expect(DaySchedule.nowOrNext(items, atMinute: 900) == nil)
     }
 
     @Test func progressCountsDoneTasks() {

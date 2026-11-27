@@ -9,7 +9,7 @@ for free (Phase 3, SideStore, is handled elsewhere: never do it here).
 
 ## Current milestone
 
-**M1 Pipeline proof: done (cloud build green). M2 Core engine: current.** Do one milestone at a time, then stop and
+**M1 Pipeline proof and M2 Core engine: done (cloud build green). M3 Main app UI: current.** Do one milestone at a time, then stop and
 report to the owner in plain English. Never start the next milestone without the owner's go-ahead.
 
 | # | Milestone | Scope |

@@ -25,19 +25,6 @@ extension ScheduledItem {
     }
 }
 
-/// What the "Preview" option in the view switcher shows.
-public enum PreviewMode: String, CaseIterable, Codable, Sendable {
-    case normal, nextEvent, theOneAfter
-
-    public var title: String {
-        switch self {
-        case .normal: "Normal"
-        case .nextEvent: "Next event"
-        case .theOneAfter: "The one after"
-        }
-    }
-}
-
 public struct DayProgress: Equatable, Sendable {
     public let done: Int
     public let total: Int
@@ -96,18 +83,9 @@ public enum DaySchedule {
         }
     }
 
-    /// The task the "now" card features for each preview mode.
-    public static func featured<Item: ScheduledItem>(
-        _ items: [Item],
-        atMinute minute: Int,
-        mode: PreviewMode
-    ) -> Item? {
-        let next = upcoming(items, afterMinute: minute)
-        switch mode {
-        case .normal: return current(items, atMinute: minute) ?? next.first
-        case .nextEvent: return next.first
-        case .theOneAfter: return next.dropFirst().first
-        }
+    /// The task the "now" card features: the one running at `minute`, else the next one to start.
+    public static func nowOrNext<Item: ScheduledItem>(_ items: [Item], atMinute minute: Int) -> Item? {
+        current(items, atMinute: minute) ?? upcoming(items, afterMinute: minute).first
     }
 
     public static func progress<Item: ScheduledItem>(_ items: [Item]) -> DayProgress {

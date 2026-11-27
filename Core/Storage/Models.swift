@@ -137,7 +137,6 @@ public final class AppSettings {
     public var categoryModeRaw: String = CategoryMode.simple.rawValue
     public var themeRaw: String = ThemeMode.dark.rawValue
     public var progressStyleRaw: String = ProgressStyle.wave.rawValue
-    public var previewModeRaw: String = PreviewMode.normal.rawValue
 
     public init() {
         self.key = AppSettings.singletonKey
@@ -166,11 +165,6 @@ public final class AppSettings {
     public var progressStyle: ProgressStyle {
         get { ProgressStyle(rawValue: progressStyleRaw) ?? .wave }
         set { progressStyleRaw = newValue.rawValue }
-    }
-
-    public var previewMode: PreviewMode {
-        get { PreviewMode(rawValue: previewModeRaw) ?? .normal }
-        set { previewModeRaw = newValue.rawValue }
     }
 
     /// Lead time for timed urgent reminders, always one of `ReminderTiming.leadTimeChoices`.

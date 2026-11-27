@@ -151,7 +151,7 @@ struct StoreTests {
         #expect(first.autoSortEnabled && first.hapticTickEnabled && first.tickSoundEnabled)
         #expect(first.widgetStyle == .matchApp)
         #expect(first.layout == .playTheDay && first.theme == .dark && first.progressStyle == .wave)
-        #expect(first.categoryMode == .simple && first.previewMode == .normal)
+        #expect(first.categoryMode == .simple)
     }
 
     @Test func settingsRejectOutOfRangeValues() throws {

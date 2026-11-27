@@ -192,6 +192,51 @@ jobs:
           if-no-files-found: warn
           retention-days: 14
 
+      # UI screenshots (M3+): launch the Debug simulator build from the test step in demo mode, one
+      # scene per launch, and upload the PNGs. Never fails the build; the summary says if it was skipped.
+      - name: UI screenshots (iOS simulator)
+        id: screenshots
+        if: steps.simulator.outcome == 'success'
+        continue-on-error: true
+        env:
+          UDID: ${{ steps.simulator.outputs.udid }}
+        run: |
+          APP="$RUNNER_TEMP/TestDerivedData/Build/Products/Debug-iphonesimulator/DailyFlow.app"
+          OUT="$RUNNER_TEMP/screenshots"
+          mkdir -p "$OUT"
+          test -d "$APP"
+          xcrun simctl boot "$UDID" 2>/dev/null || true
+          xcrun simctl bootstatus "$UDID" -b
+          xcrun simctl status_bar "$UDID" override --time "10:15" --batteryState charged --batteryLevel 100 \
+            --cellularBars 4 --wifiBars 3 || true
+          xcrun simctl install "$UDID" "$APP"
+          for scene in day day-light list list-light sorted triage add view settings notice ring bar number; do
+            xcrun simctl terminate "$UDID" com.example.dailyflow 2>/dev/null || true
+            xcrun simctl launch "$UDID" com.example.dailyflow -DFDemo YES -DFScene "$scene"
+            sleep 6
+            xcrun simctl io "$UDID" screenshot --type=png "$OUT/$scene.png"
+            echo "captured $scene"
+          done
+          ls -la "$OUT"
+
+      - name: Upload screenshots
+        if: steps.screenshots.outcome == 'success'
+        uses: actions/upload-artifact@v7
+        with:
+          name: screenshots-${{ github.run_number }}
+          path: ${{ runner.temp }}/screenshots/*.png
+          if-no-files-found: warn
+          retention-days: 14
+
+      - name: Screenshot summary
+        if: always() && steps.simulator.outcome == 'success'
+        run: |
+          {
+            echo "## UI screenshots"
+            echo ""
+            echo "- Result: ${{ steps.screenshots.outcome }} (artifact screenshots-${{ github.run_number }})"
+          } >> "$GITHUB_STEP_SUMMARY"
+
   release:
     needs: build
     if: github.ref == 'refs/heads/main'
