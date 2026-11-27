@@ -182,8 +182,9 @@ private struct ConveyorBelt: View {
                     // Fades the far edge so the belt visibly recedes.
                     LinearGradient(
                         stops: [
-                            .init(color: .black.opacity(0.2), location: 0),
-                            .init(color: .black, location: 0.55)
+                            // Gentle: blocks stay opaque enough to hide the now-line and keep titles legible.
+                            .init(color: .black.opacity(0.7), location: 0),
+                            .init(color: .black, location: 0.45)
                         ],
                         startPoint: .top,
                         endPoint: .bottom
