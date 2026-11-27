@@ -32,6 +32,7 @@ final class Playhead {
 
     var isLive: Bool { mode == .live }
     var isPlaying: Bool { mode.isPlaying }
+    var isHeld: Bool { mode.isHeld }
 
     func hold(at minute: Double) {
         mode = .held(minute)

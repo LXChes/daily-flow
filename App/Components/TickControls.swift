@@ -20,6 +20,8 @@ struct TickGlyph: View {
     @State private var burst = 0
 
     var body: some View {
+        // The keyframe closures run off the main actor, so they get plain values, not `self`.
+        let accent = palette.accent
         ZStack {
             Circle().fill(isDone ? palette.accent : Color.clear)
             Circle().strokeBorder(isDone ? palette.accent : (restingRing ?? palette.tickLine), lineWidth: 2)
@@ -38,7 +40,7 @@ struct TickGlyph: View {
                 .scaleEffect(values.pop)
                 .overlay {
                     Circle()
-                        .strokeBorder(palette.accent, lineWidth: 2)
+                        .strokeBorder(accent, lineWidth: 2)
                         .scaleEffect(values.ringScale)
                         .opacity(values.ringOpacity)
                 }
