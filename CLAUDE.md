@@ -9,7 +9,7 @@ for free (Phase 3, SideStore, is handled elsewhere: never do it here).
 
 ## Current milestone
 
-**M1 Pipeline proof: done once the cloud build is green.** Do one milestone at a time, then stop and
+**M1 Pipeline proof: done (cloud build green). M2 Core engine: current.** Do one milestone at a time, then stop and
 report to the owner in plain English. Never start the next milestone without the owner's go-ahead.
 
 | # | Milestone | Scope |
@@ -19,6 +19,17 @@ report to the owner in plain English. Never start the next milestone without the
 | M3 | Main app UI | Conveyor "Play the day", header, morning brief, leftovers sheet, notice banner, progress views, add sheet, view switcher, settings, dark + light themes |
 | M4 | Notifications + widgets | Morning brief, urgent reminders (Complete / Snooze 30m / Tomorrow), Lock + Home widgets with App Intent ticking, crash-proof data fallback |
 | M5 | Watch view | Skeleton watch (riskiest, last). Ship a simpler fallback first if the full one is not smooth |
+
+## How to work (efficiency rules)
+- Delegate big chunks only. Use the named subagents (model: sonnet) for large, self-contained pieces (M3 screens, M4 widgets, M5 watch). Do small edits yourself: a helper starts cold and costs more than it saves.
+- Short briefs. The role files in .claude/agents/ already hold the rules. Brief a helper with the task, the files it owns and the acceptance check, not a copy of the rules.
+- Audit diffs, not whole files. Spend review effort on what a compiler cannot catch: free-sideload safety, architecture, correctness of logic, design originality. Reject and rewrite below 9.5/10.
+- CI is the compiler and the warning checker. It fails on any compile error or warning. Read the logs after every push and fix failures. Do not re-check by eye what CI already checks.
+- Test pure logic. Date, rollover and notice-day logic is pure and injectable, with unit tests run in CI.
+- See the UI, don't score it blind (M3, M5). Try having CI launch the app in the iOS simulator, take screenshots and upload them as an artifact, then download and look at them. Untested idea: if it is unreliable on the runner, say so and fall back to asking the owner to check on device.
+- Runner: CI uses macos-26-intel. macos-latest (arm64) had capacity problems. Switch back only if it recovers.
+- Explain simply. The owner is not a developer. After any jargon-heavy explanation, add a plain-English version.
+- One milestone at a time. Confirm understanding first, do only the named milestone, then stop and report in plain English: what was pushed, where to check the build in the Actions tab, how to download the IPA.
 
 ## Roles
 
