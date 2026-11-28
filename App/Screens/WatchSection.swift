@@ -75,7 +75,7 @@ struct WatchSection: View {
     }
 
     /// "Lecture, 10:00, not done"
-    private func accessibilityLabel(for gear: WatchGear) -> String {
+    private func spokenLabel(for gear: WatchGear) -> String {
         let item = model.items.first { $0.id == gear.taskID }
         let time = item?.startMinute.map { Fmt.clock($0) } ?? "anytime"
         return "\(gear.title), \(time), \(item?.isDone == true ? "done" : "not done")"
