@@ -251,7 +251,27 @@ final class WatchRenderer: NSObject, MTKViewDelegate {
                 let uv = mesh.uvs[i]
                 vertexData.append(contentsOf: [p.x, p.y, p.z, n.x, n.y, n.z, uv.x, uv.y])
             }
-            let valid = mesh.indices.filter { Int($0) < count }
+            // Keep only sound triangles: indices in range, every corner finite and within 4 units of the origin.
+            var valid: [UInt32] = []
+            var dropped = 0
+            var index = 0
+            while index + 2 < mesh.indices.count {
+                let a = mesh.indices[index]
+                let b = mesh.indices[index + 1]
+                let c = mesh.indices[index + 2]
+                index += 3
+                guard Int(a) < count, Int(b) < count, Int(c) < count,
+                      Self.isSound(mesh.positions[Int(a)]), Self.isSound(mesh.positions[Int(b)]),
+                      Self.isSound(mesh.positions[Int(c)])
+                else {
+                    dropped += 1
+                    continue
+                }
+                valid.append(contentsOf: [a, b, c])
+            }
+            if dropped > 0 {
+                Self.logger.error("mesh \(ranges.count): dropped \(dropped) unsound triangles of \(mesh.indices.count / 3)")
+            }
             ranges.append(MeshRange(baseVertex: base, firstIndex: indices.count, indexCount: valid.count - valid.count % 3))
             indices.append(contentsOf: valid.prefix(valid.count - valid.count % 3))
         }
@@ -364,9 +384,27 @@ final class WatchRenderer: NSObject, MTKViewDelegate {
 
         super.init()
         Self.logger.info("pipelines and buffers ready: \(self.ranges.count) meshes, samples \(samples), shadow \(Self.shadowSize)")
+        #if DEBUG
+        for (number, drawable) in WatchScene.shared.drawables.enumerated() where drawable.mesh < WatchScene.shared.meshes.count {
+            let mesh = WatchScene.shared.meshes[drawable.mesh]
+            var low = SIMD3<Float>(repeating: .greatestFiniteMagnitude)
+            var high = SIMD3<Float>(repeating: -.greatestFiniteMagnitude)
+            for p in mesh.positions {
+                let moved = drawable.base * SIMD4<Float>(p, 1)
+                let q = SIMD3<Float>(moved.x, moved.y, moved.z)
+                low = simd_min(low, q)
+                high = simd_max(high, q)
+            }
+            Self.logger.info("part \(number) \(drawable.surface.debugName, privacy: .public) tris \(mesh.triangleCount) x \(low.x)...\(high.x) y \(low.y)...\(high.y) z \(low.z)...\(high.z)")
+        }
+        #endif
         refreshVisible()
         gearsChanged()
         lastMatrix = cameraMatrix(aspect: 360.0 / 440.0) * rootMatrix(tilt: Self.demoTilt)
+    }
+
+    private static func isSound(_ p: SIMD3<Float>) -> Bool {
+        p.x.isFinite && p.y.isFinite && p.z.isFinite && abs(p.x) < 4 && abs(p.y) < 4 && abs(p.z) < 4
     }
 
     private static func solidTexture(_ device: MTLDevice, _ rgba: [UInt8]) -> MTLTexture? {
@@ -412,6 +450,12 @@ final class WatchRenderer: NSObject, MTKViewDelegate {
             guard drawable.theme == nil || drawable.theme == theme else { return false }
             if flags.contains("nocrystal"), drawable.surface.isCrystal { return false }
             if flags.contains("nostrap"), drawable.surface.isStrap { return false }
+            if flags.contains("noprint"), drawable.surface.isPrint { return false }
+            if flags.contains("nohands"), drawable.surface.isHand { return false }
+            let name = drawable.surface.debugName.lowercased()
+            for flag in flags where flag.hasPrefix("skip:") && name.hasPrefix(flag.dropFirst(5).lowercased()) {
+                return false
+            }
             return true
         }
     }
@@ -595,21 +639,9 @@ final class WatchRenderer: NSObject, MTKViewDelegate {
         view?.setNeedsDisplay()
     }
 
+    /// The one texture path: the image is drawn into an 8-bit sRGB premultiplied bitmap (ImageRenderer's own
+    /// image may be 16-bit or wide gamut, which the texture loader refuses), uploaded by hand, and mipmapped.
     private func texture(from image: CGImage) -> MTLTexture? {
-        let options: [MTKTextureLoader.Option: Any] = [
-            .SRGB: true,
-            .generateMipmaps: true,
-            .origin: MTKTextureLoader.Origin.topLeft
-        ]
-        if let texture = try? loader.newTexture(cgImage: image, options: options) {
-            return texture
-        }
-        Self.logger.error("texture loader refused a \(image.width)x\(image.height) image; using the plain path")
-        return plainTexture(from: image)
-    }
-
-    /// The same image without mipmaps, drawn into a bitmap by hand, for when the texture loader refuses it.
-    private func plainTexture(from image: CGImage) -> MTLTexture? {
         let width = image.width
         let height = image.height
         guard width > 0, height > 0, let space = CGColorSpace(name: CGColorSpace.sRGB) else { return nil }
@@ -624,18 +656,31 @@ final class WatchRenderer: NSObject, MTKViewDelegate {
                 space: space,
                 bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue
             ) else { return false }
+            context.clear(CGRect(x: 0, y: 0, width: width, height: height))
             context.draw(image, in: CGRect(x: 0, y: 0, width: width, height: height))
             return true
         }
-        guard drawn else { return nil }
+        guard drawn else {
+            Self.logger.error("could not make a bitmap for a \(width)x\(height) image")
+            return nil
+        }
+        // CGContext rows run bottom to top in memory only if flipped; with no flip, row 0 is the top row.
         let descriptor = MTLTextureDescriptor.texture2DDescriptor(
-            pixelFormat: .rgba8Unorm_srgb, width: width, height: height, mipmapped: false
+            pixelFormat: .rgba8Unorm_srgb, width: width, height: height, mipmapped: true
         )
-        descriptor.usage = .shaderRead
-        guard let texture = device.makeTexture(descriptor: descriptor) else { return nil }
+        descriptor.usage = [.shaderRead, .renderTarget]
+        guard let texture = device.makeTexture(descriptor: descriptor) else {
+            Self.logger.error("could not allocate a \(width)x\(height) texture")
+            return nil
+        }
         texture.replace(
             region: MTLRegionMake2D(0, 0, width, height), mipmapLevel: 0, withBytes: pixels, bytesPerRow: width * 4
         )
+        if let buffer = queue.makeCommandBuffer(), let blit = buffer.makeBlitCommandEncoder() {
+            blit.generateMipmaps(for: texture)
+            blit.endEncoding()
+            buffer.commit()
+        }
         return texture
     }
 

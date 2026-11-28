@@ -268,7 +268,10 @@ fragment float4 fs_main(VertexOut in [[stage_in]],
     // Printed overlay (progress arc and label), lit softly and shadowed by the hands.
     if (kind == 7.0) {
         float4 t = auxTex.sample(texSampler, in.uv);
-        float3 c = t.a > 0.002 ? t.rgb / t.a : float3(0.0);
+        if (t.a < 0.02) {
+            discard_fragment();
+        }
+        float3 c = t.rgb / t.a;
         float lit = mix(0.45, 1.0, shadow);
         return float4(c * lit * 1.35 * t.a, t.a);
     }

@@ -111,7 +111,7 @@ jobs:
           mkdir -p "$OUT/crashes"
           find "$HOME/Library/Logs/DiagnosticReports" -name 'DailyFlow*' -newer "$APP" \
             -exec cp {} "$OUT/crashes/" \; 2>/dev/null || true
-          xcrun simctl spawn "$UDID" log show --last 10m --style compact \
+          xcrun simctl spawn "$UDID" log show --last 10m --info --debug --style compact \
             --predicate 'process == "DailyFlow"' > "$OUT/app-log.txt" 2>/dev/null || true
 
       - name: Upload preview

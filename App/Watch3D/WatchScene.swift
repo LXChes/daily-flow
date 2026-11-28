@@ -228,6 +228,22 @@ extension WatchSurface {
         return false
     }
 
+    var debugName: String { String(describing: self) }
+
+    var isPrint: Bool {
+        switch self {
+        case .ringPrint, .bezelPrint, .progress: true
+        default: false
+        }
+    }
+
+    var isHand: Bool {
+        switch self {
+        case .hand, .lume, .dayArrow, .seconds, .secondsTip, .cap, .capDot: true
+        default: false
+        }
+    }
+
     var isStrap: Bool {
         switch self {
         case .leather, .bracelet, .braceletPolished: true
