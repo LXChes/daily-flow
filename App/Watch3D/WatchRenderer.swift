@@ -683,7 +683,8 @@ final class WatchRenderer: NSObject, MTKViewDelegate {
         lastMatrix = camera * root
         let light = Self.keyLight
         let rootInverse = simd_inverse(root)
-        let lightModel = simd_normalize((rootInverse * SIMD4<Float>(light, 0)).xyz)
+        let lightModel4 = rootInverse * SIMD4<Float>(light, 0)
+        let lightModel = simd_normalize(SIMD3<Float>(lightModel4.x, lightModel4.y, lightModel4.z))
         let lightUp: SIMD3<Float> = abs(lightModel.y) > 0.95 ? SIMD3<Float>(0, 0, -1) : SIMD3<Float>(0, 1, 0)
         let lightView = WatchMat.lookAt(eye: lightModel * 4.5, center: SIMD3<Float>(0, 0, 0), up: lightUp)
         let lightViewProj = WatchMat.orthographic(half: 1.6, near: 2.0, far: 7.5) * lightView

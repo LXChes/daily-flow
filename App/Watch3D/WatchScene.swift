@@ -733,12 +733,12 @@ private struct WatchSceneBuilder {
         let breguetHour = WatchMesh.hand(.breguet, length: 66 * unit, width: 4.7 * unit, tail: 12 * unit, height: 0.011)
         let breguetMinute = WatchMesh.hand(.breguet, length: 100 * unit, width: 3.7 * unit, tail: 14 * unit, height: 0.011)
 
-        add(batonHour.body, .hand, motion: .hour, theme: .dark, shadow: true)
+        add(batonHour.body, .hand, motion: .hour, shadow: true, theme: .dark)
         add(batonHour.lume, .lume, motion: .hour, theme: .dark)
-        add(batonMinute.body, .hand, motion: .minute, theme: .dark, shadow: true)
+        add(batonMinute.body, .hand, motion: .minute, shadow: true, theme: .dark)
         add(batonMinute.lume, .lume, motion: .minute, theme: .dark)
-        add(breguetHour.body, .hand, motion: .hour, theme: .light, shadow: true)
-        add(breguetMinute.body, .hand, motion: .minute, theme: .light, shadow: true)
+        add(breguetHour.body, .hand, motion: .hour, shadow: true, theme: .light)
+        add(breguetMinute.body, .hand, motion: .minute, shadow: true, theme: .light)
 
         let arrow = WatchMesh.hand(.arrow, length: 123 * unit, width: 5.2 * unit, tail: 16 * unit, height: 0.01)
         add(arrow.body, .dayArrow, motion: .day, shadow: true)
