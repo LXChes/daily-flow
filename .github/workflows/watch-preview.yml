@@ -1,0 +1,121 @@
+name: Watch preview
+
+# Fast visual loop for the 3D watch (M5): a Debug simulator build and screenshots of the watch scenes only,
+# including diagnostic variants. It never publishes anything; the full checks stay in build-ipa.yml.
+on:
+  push:
+    paths:
+      - 'App/Watch3D/**'
+      - 'App/Screens/WatchSection.swift'
+      - 'App/Debug/DemoSupport.swift'
+      - 'WidgetUI/Watch/**'
+      - 'Core/Watch/**'
+      - '.github/workflows/watch-preview.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: watch-preview-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  preview:
+    runs-on: macos-26-intel
+    timeout-minutes: 40
+    env:
+      XCODE_VERSION: "26.6"
+      XCODEGEN_VERSION: "2.48.0"
+    defaults:
+      run:
+        shell: bash -euo pipefail {0}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Select Xcode
+        run: |
+          sudo xcode-select -s "/Applications/Xcode_${XCODE_VERSION}.app"
+          xcodebuild -version
+          if ! xcrun metal --version >/dev/null 2>&1; then xcodebuild -downloadComponent MetalToolchain; fi
+
+      - name: Install XcodeGen
+        run: |
+          curl -fsSL -o "$RUNNER_TEMP/xcodegen.zip" \
+            "https://github.com/yonaskolb/XcodeGen/releases/download/${XCODEGEN_VERSION}/xcodegen.zip"
+          unzip -q "$RUNNER_TEMP/xcodegen.zip" -d "$RUNNER_TEMP"
+          "$RUNNER_TEMP/xcodegen/bin/xcodegen" generate --spec project.yml
+
+      - name: Pick and boot iOS simulator
+        id: simulator
+        run: |
+          UDID="$(xcrun simctl list devices available --json | jq -r '
+            [.devices | to_entries | sort_by(.key)[] | select(.key | contains("iOS"))
+              | .value[] | select(.name | startswith("iPhone"))] | last | .udid // empty')"
+          test -n "$UDID"
+          echo "udid=$UDID" >> "$GITHUB_OUTPUT"
+          xcrun simctl boot "$UDID" 2>/dev/null || true
+
+      - name: Build (Debug, simulator)
+        run: |
+          xcodebuild build \
+            -project DailyFlow.xcodeproj \
+            -scheme DailyFlow \
+            -configuration Debug \
+            -destination "id=${{ steps.simulator.outputs.udid }}" \
+            -derivedDataPath "$RUNNER_TEMP/DerivedData" \
+            CODE_SIGNING_ALLOWED=NO \
+            2>&1 | tee "$RUNNER_TEMP/build.log" | grep -E "error:|warning:|BUILD" || true
+          grep -q "BUILD SUCCEEDED" "$RUNNER_TEMP/build.log"
+
+      # Each entry: <file name>|<scene>|<extra launch arguments>. DFWatchDebug is read by the DEBUG 3D renderer:
+      # face (no tilt), nocrystal, nostrap, flat (no environment reflections), or a comma list.
+      - name: Watch screenshots
+        env:
+          UDID: ${{ steps.simulator.outputs.udid }}
+        run: |
+          APP="$RUNNER_TEMP/DerivedData/Build/Products/Debug-iphonesimulator/DailyFlow.app"
+          OUT="$RUNNER_TEMP/preview"
+          mkdir -p "$OUT"
+          xcrun simctl bootstatus "$UDID" -b
+          xcrun simctl status_bar "$UDID" override --time "10:15" --batteryState charged --batteryLevel 100 || true
+          xcrun simctl install "$UDID" "$APP"
+          shots=(
+            "warmup|watch|"
+            "watch|watch|"
+            "watch-light|watch-light|"
+            "watch-face|watch|-DFWatchDebug face"
+            "watch-face-nocrystal|watch|-DFWatchDebug face,nocrystal"
+            "watch-light-face-nocrystal|watch-light|-DFWatchDebug face,nocrystal"
+            "widgets|widgets|"
+          )
+          for entry in "${shots[@]}"; do
+            IFS='|' read -r name scene extra <<< "$entry"
+            xcrun simctl terminate "$UDID" com.example.dailyflow 2>/dev/null || true
+            # shellcheck disable=SC2086
+            xcrun simctl launch "$UDID" com.example.dailyflow -DFDemo YES -DFScene "$scene" $extra
+            sleep 8
+            for attempt in $(seq 1 10); do
+              xcrun simctl io "$UDID" screenshot --type=png "$OUT/$name.png"
+              size="$(stat -f%z "$OUT/$name.png")"
+              if [ "$size" -gt 120000 ]; then break; fi
+              sleep 5
+            done
+            echo "captured $name (attempt ${attempt}, ${size} bytes)"
+          done
+          rm -f "$OUT/warmup.png"
+          mkdir -p "$OUT/crashes"
+          find "$HOME/Library/Logs/DiagnosticReports" -name 'DailyFlow*' -newer "$APP" \
+            -exec cp {} "$OUT/crashes/" \; 2>/dev/null || true
+          xcrun simctl spawn "$UDID" log show --last 10m --style compact \
+            --predicate 'process == "DailyFlow"' > "$OUT/app-log.txt" 2>/dev/null || true
+
+      - name: Upload preview
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: watch-preview-${{ github.run_number }}
+          path: ${{ runner.temp }}/preview/
+          if-no-files-found: warn
+          retention-days: 7
