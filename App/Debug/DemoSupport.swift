@@ -8,10 +8,15 @@ import SwiftData
 ///
 /// `-DFDemo YES` opens an in-memory store seeded with neutral demo tasks and a fixed clock of 10:15 on a
 /// fixed day. `-DFScene <name>` then opens a particular state straight away:
-/// day, day-light, list, list-light, sorted, triage, add, view, settings, notice, ring, bar, number.
+/// day, day-light, list, list-light, sorted, triage, add, view, settings, notice, ring, bar, number, and the
+/// widget gallery scenes widgets, widgets-light, widgets-lock, widgets-basic.
 @MainActor
 enum DemoSupport {
     private static let logger = Logger(subsystem: "com.example.dailyflow", category: "demo")
+
+    /// Set for the widget gallery scenes (widgets, widgets-light, widgets-lock, widgets-basic): the root
+    /// view then shows the widget faces instead of the app.
+    static var gallery: String?
 
     private struct Seed {
         let title: String
@@ -104,6 +109,7 @@ enum DemoSupport {
         case "settings": model.sheet = .settings
         case "view": model.showsViewSwitcher = true
         case "notice": model.setPreview(.nextNotice)
+        case "widgets", "widgets-light", "widgets-lock", "widgets-basic": gallery = scene
         case "remind": model.showDemoReminders(.notAsked)
         case "settings-off":
             model.showDemoReminders(.denied)

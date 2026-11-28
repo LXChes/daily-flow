@@ -8,6 +8,19 @@ struct RootView: View {
     @Environment(\.scenePhase) private var scenePhase
 
     var body: some View {
+        #if DEBUG
+        if let scene = DemoSupport.gallery {
+            WidgetGallery(scene: scene)
+        } else {
+            content
+        }
+        #else
+        content
+        #endif
+    }
+
+    @ViewBuilder
+    private var content: some View {
         @Bindable var model = model
         let palette = model.palette
 
