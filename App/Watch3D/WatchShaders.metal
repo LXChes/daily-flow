@@ -245,6 +245,11 @@ fragment float4 fs_main(VertexOut in [[stage_in]],
     float bevelPolish = draw.material.extra.z;
     float glow = draw.material.extra.w;
 
+    if (fr.flags.z > 1.5 && kind != 4.0 && kind != 7.0) {
+        // Debug: base colour only, no environment, no lighting.
+        return float4(base + draw.material.emissive.rgb * glow * 0.1, 1.0);
+    }
+
     float shadow = shadowFactor(in.shadowCoord, shadowMap, fr);
     // Leather and the satin bracelet are far from the movement: no shadow-map streaks on them.
     if (kind == 8.0 || (patternType > 0.5 && patternType < 1.5)) {

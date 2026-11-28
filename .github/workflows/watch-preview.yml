@@ -91,12 +91,8 @@ jobs:
             "watch-light-face-noprint|watch-light|-DFWatchDebug face,nocrystal,noprint"
             "watch-light-face-nohands|watch-light|-DFWatchDebug face,nocrystal,noprint,nohands"
             "watch-face-nostrap-flat|watch|-DFWatchDebug face,nostrap,flat"
-            "bisect-skip-hand|watch-light|-DFWatchDebug face,nocrystal,noprint,skip:hand"
-            "bisect-skip-cap|watch-light|-DFWatchDebug face,nocrystal,noprint,skip:cap"
-            "bisect-skip-seconds|watch-light|-DFWatchDebug face,nocrystal,noprint,skip:seconds"
-            "bisect-skip-dayarrow|watch-light|-DFWatchDebug face,nocrystal,noprint,skip:dayArrow"
-            "bisect-skip-lume|watch|-DFWatchDebug face,nocrystal,noprint,skip:lume"
-            "bisect-skip-bracelet|watch|-DFWatchDebug face,nocrystal,noprint,nohands,skip:bracelet"
+            "watch-light-face-flatcolor|watch-light|-DFWatchDebug face,flatcolor"
+            "watch-face-flatcolor|watch|-DFWatchDebug face,flatcolor"
             "widgets|widgets|"
           )
           for entry in "${shots[@]}"; do

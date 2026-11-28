@@ -272,8 +272,12 @@ final class WatchRenderer: NSObject, MTKViewDelegate {
             if dropped > 0 {
                 Self.logger.error("mesh \(ranges.count): dropped \(dropped) unsound triangles of \(mesh.indices.count / 3)")
             }
-            ranges.append(MeshRange(baseVertex: base, firstIndex: indices.count, indexCount: valid.count - valid.count % 3))
-            indices.append(contentsOf: valid.prefix(valid.count - valid.count % 3))
+            // The first vertex of the mesh is added to every index here, so each draw uses baseVertex 0: a large
+            // baseVertex into a big shared buffer is not trusted (the parts built last were drawn garbled).
+            let whole = valid.count - valid.count % 3
+            let offset = UInt32(base)
+            ranges.append(MeshRange(baseVertex: 0, firstIndex: indices.count, indexCount: whole))
+            indices.append(contentsOf: valid.prefix(whole).map { $0 + offset })
         }
         guard !vertexData.isEmpty, !indices.isEmpty,
               let vertexBuffer = device.makeBuffer(
@@ -785,7 +789,7 @@ final class WatchRenderer: NSObject, MTKViewDelegate {
             lightColor: SIMD4<Float>(tokens.keyColor, 1),
             envTint: SIMD4<Float>(tokens.envTint, tokens.envGain),
             timing: SIMD4<Float>(Float(time.truncatingRemainder(dividingBy: 3600)), pulse, tokens.exposure, tokens.bloom),
-            flags: SIMD4<Float>(input.frame.palette.isDark ? 1 : 0, 1 / Float(Self.shadowSize), Self.debugFlags.contains("flat") ? 1 : 0, tokens.curtain),
+            flags: SIMD4<Float>(input.frame.palette.isDark ? 1 : 0, 1 / Float(Self.shadowSize), Self.debugFlags.contains("flatcolor") ? 2 : (Self.debugFlags.contains("flat") ? 1 : 0), tokens.curtain),
             background: SIMD4<Float>(input.background, 1),
             motion: SIMD4<Float>(tilt.x, tilt.y, aspect, 0)
         )
@@ -803,6 +807,9 @@ final class WatchRenderer: NSObject, MTKViewDelegate {
         framesDrawn += 1
         if framesDrawn == 1 {
             let ms = Int((CACurrentMediaTime() - createdAt) * 1000)
+            #if DEBUG
+            logProjection(camera: camera, root: root, state: state, selection: selection)
+            #endif
             Self.logger.info("first frame encoded \(ms) ms after creation, drawable \(width)x\(height)")
         }
 
@@ -813,6 +820,49 @@ final class WatchRenderer: NSObject, MTKViewDelegate {
             view.setNeedsDisplay()
         }
     }
+
+    // MARK: Diagnostics
+
+    #if DEBUG
+    /// Projects every part's bounding box with the exact first-frame matrices and logs any that leave the screen
+    /// by a lot, always at error level so it is captured. Hand parts are always listed.
+    private func logProjection(camera: simd_float4x4, root: simd_float4x4, state: FrameState, selection: simd_float4x4?) {
+        for (number, drawable) in scene.drawables.enumerated() where drawable.mesh < scene.meshes.count {
+            guard let model = modelMatrix(drawable, state, selection: selection) else { continue }
+            let mesh = scene.meshes[drawable.mesh]
+            var low = SIMD3<Float>(repeating: .greatestFiniteMagnitude)
+            var high = SIMD3<Float>(repeating: -.greatestFiniteMagnitude)
+            for p in mesh.positions {
+                low = simd_min(low, p)
+                high = simd_max(high, p)
+            }
+            guard low.x <= high.x else { continue }
+            var minX = Float.greatestFiniteMagnitude, maxX = -Float.greatestFiniteMagnitude
+            var minY = Float.greatestFiniteMagnitude, maxY = -Float.greatestFiniteMagnitude
+            var behind = false
+            for corner in 0..<8 {
+                let point = SIMD4<Float>(
+                    corner & 1 == 0 ? low.x : high.x, corner & 2 == 0 ? low.y : high.y,
+                    corner & 4 == 0 ? low.z : high.z, 1
+                )
+                let clip = camera * (root * (model * point))
+                if clip.w <= 0.0001 {
+                    behind = true
+                    continue
+                }
+                minX = min(minX, clip.x / clip.w)
+                maxX = max(maxX, clip.x / clip.w)
+                minY = min(minY, clip.y / clip.w)
+                maxY = max(maxY, clip.y / clip.w)
+            }
+            let wide = behind || !(abs(minX) < 1.5 && abs(maxX) < 1.5 && abs(minY) < 1.5 && abs(maxY) < 1.5)
+            if wide || drawable.surface.isHand {
+                let name = drawable.surface.debugName
+                Self.logger.error("projection part \(number) \(name, privacy: .public) ndc x \(minX)...\(maxX) y \(minY)...\(maxY) behind \(behind) wide \(wide)")
+            }
+        }
+    }
+    #endif
 
     // MARK: Per-part transforms
 
