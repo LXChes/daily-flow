@@ -9,7 +9,7 @@ for free (Phase 3, SideStore, is handled elsewhere: never do it here).
 
 ## Current milestone
 
-**M1 Pipeline proof, M2 Core engine and M3 Main app UI: done (cloud build green). M4 Notifications + widgets: next, waiting for the owner's go-ahead.** Do one milestone at a time, then stop and
+**M1 Pipeline proof, M2 Core engine, M3 Main app UI and M4 Notifications + widgets: done (cloud build green). M5 Watch view: next, waiting for the owner's go-ahead (kickoff prompt: [`docs/m5-kickoff-prompt.md`](docs/m5-kickoff-prompt.md)).** Do one milestone at a time, then stop and
 report to the owner in plain English. Never start the next milestone without the owner's go-ahead.
 
 | # | Milestone | Scope |

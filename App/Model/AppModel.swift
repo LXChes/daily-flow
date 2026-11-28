@@ -77,6 +77,8 @@ final class AppModel {
     @ObservationIgnored private var rules: [NoticeRule] = []
     @ObservationIgnored private var toastTask: Task<Void, Never>?
     @ObservationIgnored private let outputs: DeviceOutputs?
+    /// Demo scenes pin the permission they show, so the simulator's real status cannot replace it.
+    @ObservationIgnored private var accessIsPinned = false
 
     private static let promptDismissedKey = "df.reminderPromptDismissed"
 
@@ -427,7 +429,7 @@ final class AppModel {
 
     /// Reads the current permission. Called whenever the app comes to the front.
     func refreshReminderAccess() async {
-        guard remindersAvailable else { return }
+        guard remindersAvailable, !accessIsPinned else { return }
         let access = await ReminderScheduler.currentAccess()
         guard access != reminderAccess else { return }
         let becameAllowed = access == .allowed
@@ -517,6 +519,7 @@ final class AppModel {
     /// Demo scenes only: pretend notifications exist, to show the reminder card and Settings rows.
     func showDemoReminders(_ access: ReminderAccess) {
         remindersAvailable = true
+        accessIsPinned = true
         reminderAccess = access
         reminderPromptDismissed = false
     }
