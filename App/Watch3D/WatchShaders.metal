@@ -108,6 +108,9 @@ float softBox(float3 d, float3 center, float3 upRef, float2 halfSize, float soft
 /// below. Tilting the watch slides these across the metal.
 float3 studio(float3 d, float rough, constant Frame &fr)
 {
+    if (fr.flags.z > 0.5) {
+        return float3(0.3) * fr.envTint.rgb;
+    }
     float soft = 0.02 + rough * rough * 0.8;
     float h = d.y;
     float3 col = mix(float3(0.012, 0.013, 0.018), float3(0.10, 0.105, 0.12), smoothstep(-0.8, 0.0, h));
@@ -243,6 +246,10 @@ fragment float4 fs_main(VertexOut in [[stage_in]],
     float glow = draw.material.extra.w;
 
     float shadow = shadowFactor(in.shadowCoord, shadowMap, fr);
+    // Leather and the satin bracelet are far from the movement: no shadow-map streaks on them.
+    if (kind == 8.0 || (patternType > 0.5 && patternType < 1.5)) {
+        shadow = 1.0;
+    }
     float3 nm = normalize(in.modelNormal);
     float3 v = normalize(fr.cameraPos.xyz - in.worldPos);
 
@@ -254,8 +261,8 @@ fragment float4 fs_main(VertexOut in [[stage_in]],
         float3 refl = studio(reflect(-v, nw), 0.03, fr);
         float3 film = 0.5 + 0.5 * cos(6.2831853 * (ndv * 0.9 + float3(0.0, 0.33, 0.67)));
         float3 tint = mix(float3(1.0), film, 0.35) * mix(float3(1.0), base, 0.5);
-        float alpha = clamp(fres * 1.4 + 0.01, 0.0, 0.85);
-        return float4(refl * fres * tint * draw.material.extra.y, alpha);
+        // Added light only (the pipeline blends One, One): the glass can never darken or hide the dial.
+        return float4(refl * fres * tint * draw.material.extra.y * 0.5, 0.0);
     }
 
     // Printed overlay (progress arc and label), lit softly and shadowed by the hands.
@@ -420,10 +427,10 @@ fragment float4 fs_composite(ScreenOut in [[stage_in]],
 
     // The 360 x 440 composition the 2D watch uses: the shadow falls a little down and right, and slides with tilt.
     float2 design = float2(in.uv.x * 360.0, in.uv.y * 440.0);
-    float2 center = float2(185.0 + fr.motion.y * 40.0, 229.0 - fr.motion.x * 40.0);
+    float2 center = float2(183.0 + fr.motion.y * 12.0, 225.0 - fr.motion.x * 12.0);
     float dist = length(design - center);
-    float shade = 1.0 - smoothstep(110.0, 175.0, dist);
-    float3 backdrop = fr.background.rgb * (1.0 - 0.6 * shade * (fr.flags.x > 0.5 ? 1.0 : 0.5));
+    float shade = 1.0 - smoothstep(120.0, 160.0, dist);
+    float3 backdrop = fr.background.rgb * (1.0 - 0.3 * shade * (fr.flags.x > 0.5 ? 1.0 : 0.5));
 
     float3 color = lit + (1.0 - scene.a) * backdrop;
     // A touch of noise so the dark gradients do not band.

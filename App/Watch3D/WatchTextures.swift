@@ -9,7 +9,13 @@ enum WatchTextures {
     /// Points across the printed square, and the scale to render it at. The square spans `2 * WatchMesh.uvExtent`
     /// mesh units, so 1 point is about `2.5 / 1024` units.
     private static let printPoints: CGFloat = 1024
-    private static let printScale: CGFloat = 1.5
+    private static let printScale: CGFloat = {
+        #if targetEnvironment(simulator)
+        1
+        #else
+        1.5
+        #endif
+    }()
 
     private static func stage(in size: CGSize) -> WatchStage {
         WatchStage(

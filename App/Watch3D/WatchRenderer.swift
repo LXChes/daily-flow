@@ -1,6 +1,7 @@
 import DailyFlowCore
 import Metal
 import MetalKit
+import OSLog
 import QuartzCore
 import SwiftUI
 import UIKit
@@ -86,10 +87,27 @@ final class WatchRenderer: NSObject, MTKViewDelegate {
     // The camera: slight perspective, filling the width like the 2D watch (its 360 x 440 composition).
     private static let cameraDistance: Float = 7.8
     private static let halfWidth: Float = 1.475
-    private static let shadowSize = 2048
+    private static let logger = Logger(subsystem: "com.example.dailyflow", category: "watch3d")
+    /// A slower simulator gets a smaller shadow map and no MSAA, so the first frame is quick.
+    private static let shadowSize: Int = {
+        #if targetEnvironment(simulator)
+        1024
+        #else
+        2048
+        #endif
+    }()
+    /// DEBUG launch argument `-DFWatchDebug face,nocrystal,nostrap,flat` (comma list) for screenshots.
+    private static let debugFlags: Set<String> = {
+        #if DEBUG
+        let raw = UserDefaults.standard.string(forKey: "DFWatchDebug") ?? ""
+        return Set(raw.split(separator: ",").map { String($0).trimmingCharacters(in: .whitespaces) })
+        #else
+        return []
+        #endif
+    }()
     private static let keyLight = simd_normalize(SIMD3<Float>(-0.5, 0.55, 0.62))
     /// The tilt used for the deterministic screenshot: the face turned a little up and to the left.
-    private static let demoTilt = SIMD2<Float>(-0.16, -0.24)
+    private static let demoTilt = SIMD2<Float>(-0.06, -0.10)
 
     // GPU objects.
     private let device: MTLDevice
@@ -132,6 +150,9 @@ final class WatchRenderer: NSObject, MTKViewDelegate {
     private var texturesDirty = true
     private var printedSignature: PrintSignature?
     private var lightStrapReady = false
+    private var framesDrawn = 0
+    private let createdAt = CACurrentMediaTime()
+    private let leatherPlaceholder: MTLTexture
 
     private let motion = WatchMotion()
     private weak var view: MTKView?
@@ -183,7 +204,11 @@ final class WatchRenderer: NSObject, MTKViewDelegate {
         view.autoResizeDrawable = true
 
         do {
+            #if targetEnvironment(simulator)
+            let samples = 1
+            #else
             let samples = device.supportsTextureSampleCount(4) ? 4 : 1
+            #endif
             let renderer = try WatchRenderer(
                 device: device, queue: queue, library: library, samples: samples,
                 outputFormat: view.colorPixelFormat, input: input
@@ -192,6 +217,7 @@ final class WatchRenderer: NSObject, MTKViewDelegate {
             view.delegate = renderer
             return renderer
         } catch {
+            logger.error("3D watch setup failed: \(String(describing: error), privacy: .public)")
             return nil
         }
     }
@@ -266,7 +292,7 @@ final class WatchRenderer: NSObject, MTKViewDelegate {
         shadowDescriptor.depthAttachmentPixelFormat = .depth32Float
         self.shadowPipeline = try device.makeRenderPipelineState(descriptor: shadowDescriptor)
 
-        func scenePipeline(blended: Bool) throws -> MTLRenderPipelineState {
+        func scenePipeline(blended: Bool, additive: Bool = false) throws -> MTLRenderPipelineState {
             let descriptor = MTLRenderPipelineDescriptor()
             descriptor.vertexFunction = try function("vs_main")
             descriptor.fragmentFunction = try function("fs_main")
@@ -281,15 +307,15 @@ final class WatchRenderer: NSObject, MTKViewDelegate {
                     color.alphaBlendOperation = .add
                     color.sourceRGBBlendFactor = .one
                     color.sourceAlphaBlendFactor = .one
-                    color.destinationRGBBlendFactor = .oneMinusSourceAlpha
-                    color.destinationAlphaBlendFactor = .oneMinusSourceAlpha
+                    color.destinationRGBBlendFactor = additive ? .one : .oneMinusSourceAlpha
+                    color.destinationAlphaBlendFactor = additive ? .one : .oneMinusSourceAlpha
                 }
             }
             return try device.makeRenderPipelineState(descriptor: descriptor)
         }
         self.opaquePipeline = try scenePipeline(blended: false)
         self.overlayPipeline = try scenePipeline(blended: true)
-        self.glassPipeline = try scenePipeline(blended: true)
+        self.glassPipeline = try scenePipeline(blended: true, additive: true)
 
         func screenPipeline(fragment: String, format: MTLPixelFormat) throws -> MTLRenderPipelineState {
             let descriptor = MTLRenderPipelineDescriptor()
@@ -324,17 +350,20 @@ final class WatchRenderer: NSObject, MTKViewDelegate {
         shadowDescriptor2.storageMode = .private
         guard let shadow = device.makeTexture(descriptor: shadowDescriptor2),
               let clear = Self.solidTexture(device, [0, 0, 0, 0]),
-              let white = Self.solidTexture(device, [255, 255, 255, 255])
+              let white = Self.solidTexture(device, [255, 255, 255, 255]),
+              let leather = Self.solidTexture(device, [40, 20, 10, 255])
         else { throw WatchRenderError.missingResource("textures") }
         self.shadowMap = shadow
         self.clearTexture = clear
         self.whiteTexture = white
         self.ringsTexture = clear
         self.progressTexture = clear
-        self.leatherUpper = white
-        self.leatherLower = white
+        self.leatherUpper = leather
+        self.leatherLower = leather
+        self.leatherPlaceholder = leather
 
         super.init()
+        Self.logger.info("pipelines and buffers ready: \(self.ranges.count) meshes, samples \(samples), shadow \(Self.shadowSize)")
         refreshVisible()
         gearsChanged()
         lastMatrix = cameraMatrix(aspect: 360.0 / 440.0) * rootMatrix(tilt: Self.demoTilt)
@@ -378,7 +407,13 @@ final class WatchRenderer: NSObject, MTKViewDelegate {
 
     private func refreshVisible() {
         let theme = input.frame.theme
-        visible = scene.drawables.filter { $0.theme == nil || $0.theme == theme }
+        let flags = Self.debugFlags
+        visible = scene.drawables.filter { drawable in
+            guard drawable.theme == nil || drawable.theme == theme else { return false }
+            if flags.contains("nocrystal"), drawable.surface.isCrystal { return false }
+            if flags.contains("nostrap"), drawable.surface.isStrap { return false }
+            return true
+        }
     }
 
     private func gearsChanged() {
@@ -532,8 +567,13 @@ final class WatchRenderer: NSObject, MTKViewDelegate {
     /// Redraws the painted images if the tasks, theme or minute changed. Runs after a frame has been presented,
     /// so the first frame is never held up by it.
     private func refreshTexturesIfNeeded() {
-        guard texturesDirty else { return }
+        // Let a couple of frames reach the screen before the slow image work.
+        guard texturesDirty, framesDrawn >= 2 else {
+            if texturesDirty { view?.setNeedsDisplay() }
+            return
+        }
         texturesDirty = false
+        let started = CACurrentMediaTime()
         let frame = input.frame
         printedSignature = PrintSignature(theme: frame.theme, arcs: frame.arcs, progress: frame.progress)
         if let image = WatchTextures.ringsImage(frame), let texture = texture(from: image) {
@@ -551,6 +591,7 @@ final class WatchRenderer: NSObject, MTKViewDelegate {
             }
             lightStrapReady = true
         }
+        Self.logger.info("printed textures ready in \(Int((CACurrentMediaTime() - started) * 1000)) ms")
         view?.setNeedsDisplay()
     }
 
@@ -563,6 +604,7 @@ final class WatchRenderer: NSObject, MTKViewDelegate {
         if let texture = try? loader.newTexture(cgImage: image, options: options) {
             return texture
         }
+        Self.logger.error("texture loader refused a \(image.width)x\(image.height) image; using the plain path")
         return plainTexture(from: image)
     }
 
@@ -667,7 +709,7 @@ final class WatchRenderer: NSObject, MTKViewDelegate {
         let animating = !input.isDemo && !input.reduceMotion
         let time = animating ? now : 0
         let pulse: Float = animating ? Float(0.55 + 0.45 * sin(5 * now)) : 0.85
-        let tilt = input.isDemo ? Self.demoTilt : motion.step(dt: dt, time: now)
+        let tilt = Self.debugFlags.contains("face") ? SIMD2<Float>(0, 0) : (input.isDemo ? Self.demoTilt : motion.step(dt: dt, time: now))
 
         let date = input.clock.now()
         var minute = input.clock.fractionalMinute(of: date)
@@ -698,7 +740,7 @@ final class WatchRenderer: NSObject, MTKViewDelegate {
             lightColor: SIMD4<Float>(tokens.keyColor, 1),
             envTint: SIMD4<Float>(tokens.envTint, tokens.envGain),
             timing: SIMD4<Float>(Float(time.truncatingRemainder(dividingBy: 3600)), pulse, tokens.exposure, tokens.bloom),
-            flags: SIMD4<Float>(input.frame.palette.isDark ? 1 : 0, 1 / Float(Self.shadowSize), 0, tokens.curtain),
+            flags: SIMD4<Float>(input.frame.palette.isDark ? 1 : 0, 1 / Float(Self.shadowSize), Self.debugFlags.contains("flat") ? 1 : 0, tokens.curtain),
             background: SIMD4<Float>(input.background, 1),
             motion: SIMD4<Float>(tilt.x, tilt.y, aspect, 0)
         )
@@ -713,6 +755,11 @@ final class WatchRenderer: NSObject, MTKViewDelegate {
 
         commandBuffer.present(drawable)
         commandBuffer.commit()
+        framesDrawn += 1
+        if framesDrawn == 1 {
+            let ms = Int((CACurrentMediaTime() - createdAt) * 1000)
+            Self.logger.info("first frame encoded \(ms) ms after creation, drawable \(width)x\(height)")
+        }
 
         // After the frame is away: repaint the printed images if they are stale, and keep an on-demand view
         // redrawing until a released drag has settled.

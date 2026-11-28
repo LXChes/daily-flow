@@ -223,6 +223,18 @@ struct WatchMaterialContext {
 }
 
 extension WatchSurface {
+    var isCrystal: Bool {
+        if case .crystal = self { return true }
+        return false
+    }
+
+    var isStrap: Bool {
+        switch self {
+        case .leather, .bracelet, .braceletPolished: true
+        default: false
+        }
+    }
+
     func material(_ context: WatchMaterialContext) -> WatchGPUMaterial {
         let t = context.tokens
         switch self {
