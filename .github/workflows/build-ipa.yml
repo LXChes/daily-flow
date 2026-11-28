@@ -246,13 +246,20 @@ jobs:
             echo "captured $scene"
           done
           ls -la "$OUT"
+          # Crash reports from the demo launches (if any), so a scene that dies can be diagnosed.
+          mkdir -p "$OUT/crashes"
+          find "$HOME/Library/Logs/DiagnosticReports" -name 'DailyFlow*' -newer "$APP" \
+            -exec cp {} "$OUT/crashes/" \; 2>/dev/null || true
+          ls -la "$OUT/crashes"
 
       - name: Upload screenshots
         if: steps.screenshots.outcome == 'success'
         uses: actions/upload-artifact@v7
         with:
           name: screenshots-${{ github.run_number }}
-          path: ${{ runner.temp }}/screenshots/*.png
+          path: |
+            ${{ runner.temp }}/screenshots/*.png
+            ${{ runner.temp }}/screenshots/crashes/
           if-no-files-found: warn
           retention-days: 14
 
