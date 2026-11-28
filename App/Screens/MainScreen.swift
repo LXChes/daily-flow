@@ -5,7 +5,25 @@ struct MainScreen: View {
     @Environment(AppModel.self) private var model
     @Environment(\.palette) private var palette
 
+    /// Scroll anchor of the watch, so the demo can bring it on screen.
+    private static let watchID = "watch"
+
     var body: some View {
+        ScrollViewReader { proxy in
+            content
+                .task {
+                    #if DEBUG
+                    // Demo scenes `watch` and `watch-light`: show the whole watch on launch.
+                    if DemoSupport.revealsWatch {
+                        try? await Task.sleep(for: .milliseconds(700))
+                        proxy.scrollTo(MainScreen.watchID, anchor: .top)
+                    }
+                    #endif
+                }
+        }
+    }
+
+    private var content: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 0) {
                 HeaderView()
@@ -48,6 +66,13 @@ struct MainScreen: View {
                 if model.layout == .playTheDay {
                     PlayTheDaySection()
                         .padding(.top, 18)
+                        .transition(.opacity)
+                }
+
+                if model.layout == .watch {
+                    WatchSection()
+                        .padding(.top, 18)
+                        .id(MainScreen.watchID)
                         .transition(.opacity)
                 }
 

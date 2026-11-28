@@ -3,7 +3,7 @@ import SwiftUI
 import WidgetKit
 
 // The widget faces. `DFWidgetView` picks the face for a widget kind and family; the faces themselves are in
-// `WidgetFaces.swift`, the shared marks in `WidgetParts.swift`, and the 24-hour dial in `DialPlaceholder.swift`.
+// `WidgetFaces.swift`, the shared marks in `WidgetParts.swift`, and the skeleton watch in `WidgetUI/Watch/`.
 
 /// The face of one widget, for one family. Pure: everything comes in as parameters, so the app's demo
 /// gallery can draw it too (`widgetFamily` cannot be set from outside WidgetKit).

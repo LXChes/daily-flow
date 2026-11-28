@@ -18,6 +18,9 @@ enum DemoSupport {
     /// view then shows the widget faces instead of the app.
     static var gallery: String?
 
+    /// Set for the watch scenes: the main screen scrolls the watch into view after launch.
+    static var revealsWatch = false
+
     private struct Seed {
         let title: String
         var start: Int?
@@ -113,6 +116,7 @@ enum DemoSupport {
         case "settings": presentSheet(.settings, on: model)
         case "view": model.showsViewSwitcher = true
         case "notice": model.setPreview(.nextNotice)
+        case "watch", "watch-light": revealsWatch = true
         case "widgets", "widgets-light", "widgets-lock", "widgets-basic": gallery = scene
         case "remind": model.showDemoReminders(.notAsked)
         case "settings-off":

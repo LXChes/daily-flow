@@ -412,19 +412,20 @@ enum WaveChartPainter {
     }
 }
 
-// MARK: Day dial (Home medium, Lock circular)
+// MARK: Day dial: the skeleton watch (Home medium, Lock circular)
 
-/// Lock Screen circular: the mini 24-hour dial. Basic mode still works: the hand and arrow read the time.
+/// Lock Screen circular: the skeleton watch, simplified (bezel ring, task arcs, wheel outlines, hands and the
+/// "now" arrow). Basic mode still works: the hands and arrow read the time.
 struct DayDialCircularFace: View {
     let entry: DFWidgetEntry
     let look: WidgetLook
 
     var body: some View {
-        DialPlaceholder(tasks: entry.snapshot.tasks, minute: entry.minute, diameter: 64, look: look)
+        WatchFaceView(tasks: entry.snapshot.tasks, minute: entry.minute, diameter: 64, look: look)
     }
 }
 
-/// Home medium: the dial on the left, "Up next" with two tickable tasks and the count on the right.
+/// Home medium: the skeleton watch head on the left, "Up next" with two tickable tasks and the count on the right.
 struct DayDialMediumFace: View {
     let entry: DFWidgetEntry
     let look: WidgetLook
@@ -434,7 +435,7 @@ struct DayDialMediumFace: View {
         let progress = snapshot.progress
         let live = entry.day.hasTasks && progress.total > 0
         HStack(spacing: 16) {
-            DialPlaceholder(tasks: snapshot.tasks, minute: entry.minute, diameter: 124, look: look)
+            WatchFaceView(tasks: snapshot.tasks, minute: entry.minute, diameter: 134, look: look)
             if live {
                 liveColumn(snapshot: snapshot, progress: progress)
             } else {

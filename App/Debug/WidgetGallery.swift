@@ -103,7 +103,7 @@ private struct HomeScene: View {
                 GalleryWidget(kind: .wave, family: .systemMedium, mode: .fullColor, entry: entry,
                               caption: "systemMedium \u{00B7} wave", wallpaper: palette)
                 GalleryWidget(kind: .dayDial, family: .systemMedium, mode: .fullColor, entry: entry,
-                              caption: "systemMedium \u{00B7} dayDial (placeholder dial)", wallpaper: palette)
+                              caption: "systemMedium \u{00B7} dayDial (skeleton watch)", wallpaper: palette)
             }
         }
         .environment(\.palette, palette)

@@ -17,8 +17,7 @@ enum DFWidgetKind: String, CaseIterable, Sendable {
     case doneRing = "df.done"
     /// Home medium: busy-time bars with done tasks lit and a now line.
     case wave = "df.wave"
-    /// Lock Screen circular: mini 24-hour dial. Home medium: dial + two tickable tasks.
-    /// PLACEHOLDER dial: M5 must replace it with the rich skeleton-watch rendering (see `docs/m5-watch-handoff.md`).
+    /// Lock Screen circular: the skeleton watch, simplified. Home medium: the watch head + two tickable tasks.
     case dayDial = "df.dial"
     /// Lock Screen inline: notice day or progress line.
     case todayLine = "df.line"
@@ -40,7 +39,7 @@ enum DFWidgetKind: String, CaseIterable, Sendable {
         case .progressRing: "How much of today is done."
         case .doneRing: "Tasks done out of today\u{2019}s total."
         case .wave: "Busy times across the day, with done tasks lit."
-        case .dayDial: "Your day on a 24-hour dial."
+        case .dayDial: "Your day as a skeleton watch: tasks are gears and arcs."
         case .todayLine: "A notice day or today\u{2019}s progress, above the clock."
         }
     }
