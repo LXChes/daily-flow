@@ -242,8 +242,16 @@ jobs:
             xcrun simctl terminate "$UDID" com.example.dailyflow 2>/dev/null || true
             xcrun simctl launch "$UDID" com.example.dailyflow -DFDemo YES -DFScene "$scene"
             sleep 6
-            xcrun simctl io "$UDID" screenshot --type=png "$OUT/$scene.png"
-            echo "captured $scene"
+            # The runner's simulator is sometimes still launching after 6 s: a frame that has not drawn
+            # yet is a plain black PNG of about 73 KB. Wait and retake until the app has drawn.
+            for attempt in 1 2 3 4 5; do
+              xcrun simctl io "$UDID" screenshot --type=png "$OUT/$scene.png"
+              size="$(stat -f%z "$OUT/$scene.png")"
+              if [ "$size" -gt 120000 ]; then break; fi
+              echo "$scene: not drawn yet (${size} bytes), retrying"
+              sleep 5
+            done
+            echo "captured $scene (attempt ${attempt}, ${size} bytes)"
           done
           ls -la "$OUT"
           # Crash reports from the demo launches (if any), so a scene that dies can be diagnosed.
