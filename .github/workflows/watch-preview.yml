@@ -70,7 +70,7 @@ jobs:
           grep -q "BUILD SUCCEEDED" "$RUNNER_TEMP/build.log"
 
       # Each entry: <file name>|<scene>|<extra launch arguments>. DFWatchDebug is read by the DEBUG 3D renderer:
-      # face (no tilt), nocrystal, nostrap, flat (no environment reflections), or a comma list.
+      # face (no tilt), nocrystal, nostrap, noprint, nohands, flat (no environment reflections), or a comma list.
       - name: Watch screenshots
         env:
           UDID: ${{ steps.simulator.outputs.udid }}
@@ -88,6 +88,9 @@ jobs:
             "watch-face|watch|-DFWatchDebug face"
             "watch-face-nocrystal|watch|-DFWatchDebug face,nocrystal"
             "watch-light-face-nocrystal|watch-light|-DFWatchDebug face,nocrystal"
+            "watch-light-face-noprint|watch-light|-DFWatchDebug face,nocrystal,noprint"
+            "watch-light-face-nohands|watch-light|-DFWatchDebug face,nocrystal,noprint,nohands"
+            "watch-face-nostrap-flat|watch|-DFWatchDebug face,nostrap,flat"
             "widgets|widgets|"
           )
           for entry in "${shots[@]}"; do
