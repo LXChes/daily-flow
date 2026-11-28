@@ -507,6 +507,13 @@ final class AppModel {
     }
 
     #if DEBUG
+    /// Demo scenes only: today's snapshot exactly as the widgets would receive it, and the demo clock.
+    func demoWidgetSnapshot() -> (snapshot: DaySnapshot, now: Date, calendar: Calendar)? {
+        let now = clock.now()
+        guard let snapshot = try? engine.snapshot(now: now, calendar: clock.calendar) else { return nil }
+        return (snapshot, now, clock.calendar)
+    }
+
     /// Demo scenes only: pretend notifications exist, to show the reminder card and Settings rows.
     func showDemoReminders(_ access: ReminderAccess) {
         remindersAvailable = true

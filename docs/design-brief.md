@@ -47,5 +47,7 @@ Home Screen: medium Wave ("3 of 8 done", busy-time bars, now line); medium Watch
 ## Notes for the build
 - WidgetKit can't animate live: the watch widget refreshes on a timeline; ticking via App Intents (iOS 17+).
 - The prototype watch is layered SVG; natively use SceneKit/RealityKit or a Metal-shaded SwiftUI Canvas with device-motion tilt parallax.
-- Free-sideload constraints (no App Groups): widget data fallback as described above.
+- Free-sideload constraints: the IPA *requests* an App Group (Plan A, owner-approved in M4) and works without it
+  (Plan B, basic widgets). See `docs/widgets-shared-folder.md`.
+- M4's 24-hour widget dial is a placeholder; M5 replaces it with the rich watch (`docs/m5-watch-handoff.md`).
 - Repo must be PUBLIC (free macOS build minutes). Zero secrets or personal data in it.
