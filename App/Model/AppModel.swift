@@ -65,20 +65,38 @@ final class AppModel {
     /// Bumps each time something is ticked off, to drive the haptic.
     private(set) var tickPulse = 0
 
+    // Reminders and widgets
+    private(set) var reminderAccess: ReminderAccess = .unknown
+    /// False in demo builds, which never touch notifications.
+    private(set) var remindersAvailable: Bool
+    private(set) var reminderPromptDismissed: Bool
+
     @ObservationIgnored private let container: ModelContainer
     @ObservationIgnored private let engine: DayEngine
     @ObservationIgnored private var storedByID: [UUID: FlowTask] = [:]
     @ObservationIgnored private var rules: [NoticeRule] = []
     @ObservationIgnored private var toastTask: Task<Void, Never>?
+    @ObservationIgnored private let outputs: DeviceOutputs?
 
-    init(container: ModelContainer, isTemporaryStore: Bool, clock: DFClock) {
+    private static let promptDismissedKey = "df.reminderPromptDismissed"
+
+    /// `outputs` is nil in demo builds: no notifications, no widget files.
+    init(container: ModelContainer, isTemporaryStore: Bool, clock: DFClock, outputs: DeviceOutputs? = nil) {
         self.container = container
         self.isTemporaryStore = isTemporaryStore
         self.clock = clock
+        self.outputs = outputs
+        self.remindersAvailable = outputs != nil
+        self.reminderPromptDismissed = UserDefaults.standard.bool(forKey: Self.promptDismissedKey)
         let engine = DayEngine(context: container.mainContext)
         self.engine = engine
         self.settings = (try? engine.settings.current()) ?? AppSettings()
         self.today = clock.today
+        if outputs != nil {
+            WidgetTickRouter.appHandler = { [weak self] id, done in
+                self?.applyWidgetTick(id, done: done)
+            }
+        }
         reload()
     }
 
@@ -100,6 +118,14 @@ final class AppModel {
     var bannerTitle: String {
         "It\u{2019}s " + activeNotices.map(\.title).joined(separator: " \u{00B7} ")
     }
+
+    /// The one-off "Let Daily Flow remind you" card.
+    var showsReminderPrompt: Bool {
+        remindersAvailable && reminderAccess == .notAsked && !reminderPromptDismissed && preview == .normal
+    }
+
+    /// True when the widgets can see real tasks (the shared folder was granted).
+    var widgetsShareData: Bool { WidgetDataStore.isShared }
 
     var showsLeftoversCard: Bool {
         settings.leftoversTriageEnabled && !leftovers.isEmpty && preview == .normal
@@ -165,6 +191,7 @@ final class AppModel {
     func reload() {
         let now = clock.now()
         do {
+            outputs?.applyWidgetTicks(to: engine.tasks)
             let status = try engine.refresh(now: now, calendar: clock.calendar)
             let current = try engine.settings.current()
             if current !== settings {
@@ -195,6 +222,7 @@ final class AppModel {
             todaysNotices = status.notices
             noticeRows = noticeStored.map { noticeRow($0, today: status.today) }
             refreshPreview()
+            outputs?.sync(engine: engine, now: now, calendar: clock.calendar)
         } catch {
             Self.logger.error("Reload failed: \(error.localizedDescription, privacy: .public)")
         }
@@ -297,6 +325,7 @@ final class AppModel {
         let makeDone = !task.isDone
         guard commit({ try engine.tasks.setDone(task, makeDone, at: clock.now()) }) else { return }
         if makeDone {
+            clearReminders(for: id)
             tickPulse &+= 1
             if settings.tickSoundEnabled {
                 TickSound.play()
@@ -312,7 +341,20 @@ final class AppModel {
             say("No longer urgent")
             return
         }
-        if task.startMinute != nil {
+        askForRemindersIfNeeded()
+        if reminderAccess == .denied {
+            say("Urgent \u{00B7} notifications are off in iOS Settings")
+            return
+        }
+        let fires = ReminderPlanner.urgentFireDate(
+            for: ReminderTask(task),
+            preferences: ReminderPreferences(settings),
+            now: clock.now(),
+            calendar: clock.calendar
+        )
+        if fires == nil {
+            say("Urgent \u{00B7} its reminder time has passed")
+        } else if task.startMinute != nil {
             say("Urgent \u{00B7} reminder \(settings.urgentLead) minutes before")
         } else {
             say("Urgent \u{00B7} reminder at \(Fmt.clock(settings.untimedReminderTime))")
@@ -359,6 +401,9 @@ final class AppModel {
             )
         }
         guard added else { return false }
+        if isUrgent {
+            askForRemindersIfNeeded()
+        }
 
         var parts = ["Added to " + dayWord(day)]
         if let startMinute {
@@ -377,6 +422,98 @@ final class AppModel {
         if away == 1 { return "tomorrow" }
         return DateText.medium(day, calendar: clock.calendar)
     }
+
+    // MARK: Reminders
+
+    /// Reads the current permission. Called whenever the app comes to the front.
+    func refreshReminderAccess() async {
+        guard remindersAvailable else { return }
+        let access = await ReminderScheduler.currentAccess()
+        guard access != reminderAccess else { return }
+        let becameAllowed = access == .allowed
+        reminderAccess = access
+        if becameAllowed {
+            // Plans made before permission was granted were never applied.
+            outputs?.invalidateReminders()
+            reload()
+        }
+    }
+
+    /// Shows the system prompt, from the reminder card or the first urgent task.
+    func requestReminders() async {
+        guard remindersAvailable else { return }
+        let access = await ReminderScheduler.requestAccess()
+        reminderAccess = access
+        dismissReminderPrompt()
+        outputs?.invalidateReminders()
+        reload()
+        if access == .denied {
+            say("Reminders are off \u{00B7} you can turn them on in iOS Settings")
+        }
+    }
+
+    func dismissReminderPrompt() {
+        reminderPromptDismissed = true
+        UserDefaults.standard.set(true, forKey: Self.promptDismissedKey)
+    }
+
+    func openNotificationSettings() {
+        guard let url = URL(string: UIApplication.openNotificationSettingsURLString) else { return }
+        UIApplication.shared.open(url)
+    }
+
+    /// A Lock Screen button: Complete, Snooze 30m or Move to Tomorrow. Finishes saving and rescheduling
+    /// before returning, because iOS may suspend the app straight after.
+    func handleReminder(_ action: ReminderAction, taskID: UUID) async {
+        let now = clock.now()
+        do {
+            guard let task = try engine.tasks.task(id: taskID) else { return }
+            switch action {
+            case .complete:
+                try engine.tasks.setDone(task, true, at: now)
+                clearReminders(for: taskID)
+            case .snooze:
+                outputs?.snooze(taskID, now: now)
+            case .tomorrow:
+                let tomorrow = CalendarDay.today(now: now, calendar: clock.calendar).adding(days: 1)
+                try engine.tasks.move(task, to: tomorrow)
+                outputs?.clearSnooze(taskID)
+            }
+        } catch {
+            Self.logger.error("Reminder action failed: \(error.localizedDescription, privacy: .public)")
+            return
+        }
+        reload()
+        await outputs?.scheduler.flush()
+    }
+
+    private func askForRemindersIfNeeded() {
+        guard remindersAvailable, reminderAccess == .notAsked else { return }
+        Task { await requestReminders() }
+    }
+
+    /// A tick made on a widget, when iOS runs the intent inside the app.
+    private func applyWidgetTick(_ id: UUID, done: Bool) {
+        guard let task = try? engine.tasks.task(id: id), task.isDone != done else { return }
+        if commit({ try engine.tasks.setDone(task, done, at: clock.now()) }), done {
+            clearReminders(for: id)
+        }
+    }
+
+    private func clearReminders(for id: UUID) {
+        guard let outputs else { return }
+        outputs.clearSnooze(id)
+        ReminderScheduler.clear(task: id)
+    }
+
+    #if DEBUG
+    /// Demo scenes only: pretend notifications exist, to show the reminder card and Settings rows.
+    func showDemoReminders(_ access: ReminderAccess) {
+        remindersAvailable = true
+        reminderAccess = access
+        reminderPromptDismissed = false
+    }
+    #endif
 
     // MARK: Notice actions
 

@@ -28,6 +28,8 @@ targets:
     platform: iOS
     sources:
       - path: App
+      # Widget faces and the tick intent, shared with the widget (the DEBUG gallery draws them too).
+      - path: WidgetUI
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.example.dailyflow
@@ -56,7 +58,19 @@ targets:
       - path: Widget
         excludes:
           - Info.plist
+      - path: WidgetUI
+      # The app's theme tokens, type styles and fonts, so widgets match the Chrome Conveyor look.
+      # The extension has its own bundle, so it carries its own copy of the fonts.
+      - path: App/Theme/Palette.swift
+      - path: App/Theme/Typography.swift
+      - path: App/Components/ChromeText.swift
+      - path: App/Components/IridescentFill.swift
+      - path: App/Fonts/Syne-Variable.ttf
+      - path: App/Fonts/Inter-Variable.ttf
     dependencies:
+      # Linked, not embedded: the app embeds the one copy in DailyFlow.app/Frameworks.
+      - target: DailyFlowCore
+        embed: false
       - sdk: AppIntents.framework
     # NSExtension has no INFOPLIST_KEY_* equivalent, so the extension uses an
     # explicit, XcodeGen-written Info.plist (GENERATE_INFOPLIST_FILE off).
@@ -80,11 +94,14 @@ targets:
         GENERATE_INFOPLIST_FILE: NO
         INFOPLIST_FILE: Widget/Info.plist
         SKIP_INSTALL: YES
+        APPLICATION_EXTENSION_API_ONLY: YES
+        # Finds DailyFlowCore.framework in the containing app (PlugIns/X.appex -> ../../Frameworks).
+        LD_RUNPATH_SEARCH_PATHS: "$(inherited) @executable_path/Frameworks @executable_path/../../Frameworks"
         ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME: AccentColor
         ASSETCATALOG_COMPILER_WIDGET_BACKGROUND_COLOR_NAME: WidgetBackground
 
-  # Shared engine: SwiftData models, day rollover, notice days, snapshot. Embedded in the app;
-  # the widget links it in M4. Extension-safe so it can be linked from the widget.
+  # Shared engine: SwiftData models, day rollover, notice days, snapshot, reminder planning and widget
+  # data. Embedded in the app and linked by the widget. Extension-safe.
   DailyFlowCore:
     type: framework
     platform: iOS

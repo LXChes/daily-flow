@@ -34,6 +34,13 @@ struct MainScreen: View {
                         .transition(.move(edge: .top).combined(with: .opacity))
                 }
 
+                if model.showsReminderPrompt {
+                    ReminderCard()
+                        .padding(.horizontal, Metrics.gutter)
+                        .padding(.top, 14)
+                        .transition(.move(edge: .top).combined(with: .opacity))
+                }
+
                 ProgressSection()
                     .padding(.horizontal, Metrics.gutter)
                     .padding(.top, 14)
@@ -54,6 +61,7 @@ struct MainScreen: View {
         .scrollBounceBehavior(.basedOnSize)
         .animation(model.animated(Motion.settle), value: model.showsBanner)
         .animation(model.animated(Motion.settle), value: model.showsLeftoversCard)
+        .animation(model.animated(Motion.settle), value: model.showsReminderPrompt)
         .animation(model.animated(Motion.theme), value: model.layout)
     }
 }

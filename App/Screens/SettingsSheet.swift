@@ -75,6 +75,10 @@ struct SettingsSheet: View {
 
     private var morningSection: some View {
         section("MORNINGS") {
+            if let status = reminderStatus {
+                statusRow(status)
+                RowDivider()
+            }
             SwitchRow(
                 title: "Morning brief",
                 subtitle: "A gentle notification with your day ahead",
@@ -143,6 +147,8 @@ struct SettingsSheet: View {
 
     private var widgetSection: some View {
         section("WIDGETS") {
+            statusRow(widgetStatus)
+            RowDivider()
             optionRow(title: "Widget style", subtitle: "Long-press any widget to give it its own style") {
                 ChipGroup(
                     values: WidgetStyle.allCases,
@@ -173,6 +179,82 @@ struct SettingsSheet: View {
                 model.updateSettings { $0.tickSoundEnabled = value }
             }
         }
+    }
+
+    // MARK: Status rows
+
+    private struct Status {
+        let symbol: String
+        let title: String
+        let detail: String
+        let isWarning: Bool
+        var action: (title: String, run: () -> Void)?
+    }
+
+    /// Only shown when reminders need the owner: not asked yet, or switched off in iOS Settings.
+    private var reminderStatus: Status? {
+        guard model.remindersAvailable else { return nil }
+        switch model.reminderAccess {
+        case .notAsked:
+            return Status(
+                symbol: "bell",
+                title: "Reminders need your OK",
+                detail: "Allow notifications for the brief and urgent nudges.",
+                isWarning: false,
+                action: ("Allow", { Task { await model.requestReminders() } })
+            )
+        case .denied:
+            return Status(
+                symbol: "bell.slash",
+                title: "Notifications are off",
+                detail: "The brief and urgent reminders can\u{2019}t appear until you allow them in iOS Settings.",
+                isWarning: true,
+                action: ("Open Settings", { model.openNotificationSettings() })
+            )
+        case .allowed, .unknown:
+            return nil
+        }
+    }
+
+    private var widgetStatus: Status {
+        if model.widgetsShareData {
+            return Status(
+                symbol: "checkmark.seal",
+                title: "Full widgets",
+                detail: "Widgets show your tasks and can tick them off.",
+                isWarning: false
+            )
+        }
+        return Status(
+            symbol: "square.dashed",
+            title: "Basic widgets",
+            detail: "Widgets show the date, time and notice days. Your tasks need the shared folder, which this install wasn\u{2019}t given.",
+            isWarning: false
+        )
+    }
+
+    private func statusRow(_ status: Status) -> some View {
+        HStack(alignment: .center, spacing: 12) {
+            Image(systemName: status.symbol)
+                .font(.system(size: 14, weight: .bold))
+                .foregroundStyle(status.isWarning ? palette.urgent : palette.accent)
+                .frame(width: 32, height: 32)
+                .background(status.isWarning ? palette.urgentTint : palette.accentSoft, in: Circle())
+                .accessibilityHidden(true)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(status.title).dfStyle(.body).foregroundStyle(palette.ink)
+                Text(status.detail)
+                    .dfStyle(.caption)
+                    .foregroundStyle(palette.inkSecondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            Spacer(minLength: 8)
+            if let action = status.action {
+                AccentPill(title: action.title, action: action.run)
+            }
+        }
+        .padding(.vertical, 12)
+        .accessibilityElement(children: .contain)
     }
 
     // MARK: Helpers

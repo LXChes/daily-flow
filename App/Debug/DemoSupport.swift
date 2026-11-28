@@ -104,6 +104,10 @@ enum DemoSupport {
         case "settings": model.sheet = .settings
         case "view": model.showsViewSwitcher = true
         case "notice": model.setPreview(.nextNotice)
+        case "remind": model.showDemoReminders(.notAsked)
+        case "settings-off":
+            model.showDemoReminders(.denied)
+            model.sheet = .settings
         default: break
         }
     }

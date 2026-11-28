@@ -56,4 +56,28 @@ public final class DayEngine {
             theme: current.theme
         )
     }
+
+    /// Every reminder that should be pending now. `snoozes` comes from the app's own storage.
+    public func reminderPlan(snoozes: SnoozeBook, now: Date, calendar: Calendar) throws -> [PlannedReminder] {
+        let today = CalendarDay.today(now: now, calendar: calendar)
+        let current = try settings.current()
+        let upcoming = try tasks.tasks(from: today).map(ReminderTask.init)
+        let rules = try notices.activeRules(noticesEnabled: current.noticesEnabled)
+        var noticesByDay: [CalendarDay: [String]] = [:]
+        for offset in 0..<ReminderPlanner.briefDays {
+            let day = today.adding(days: offset)
+            let titles = NoticeCalendar.notices(on: day, rules: rules).map(\.title)
+            if !titles.isEmpty {
+                noticesByDay[day] = titles
+            }
+        }
+        return ReminderPlanner.plan(
+            tasks: upcoming,
+            notices: noticesByDay,
+            snoozes: snoozes,
+            preferences: ReminderPreferences(current),
+            now: now,
+            calendar: calendar
+        )
+    }
 }

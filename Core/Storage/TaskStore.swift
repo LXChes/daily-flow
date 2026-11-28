@@ -29,6 +29,23 @@ public final class TaskStore {
         return try context.fetch(descriptor)
     }
 
+    /// One task by id, on any day.
+    public func task(id: UUID) throws -> FlowTask? {
+        var descriptor = FetchDescriptor<FlowTask>(predicate: #Predicate { $0.id == id })
+        descriptor.fetchLimit = 1
+        return try context.fetch(descriptor).first
+    }
+
+    /// Every task from `day` onwards, for planning reminders.
+    public func tasks(from day: CalendarDay) throws -> [FlowTask] {
+        let key = day.key
+        let descriptor = FetchDescriptor<FlowTask>(
+            predicate: #Predicate { $0.dayKey >= key },
+            sortBy: [SortDescriptor(\.dayKey), SortDescriptor(\.sortIndex)]
+        )
+        return try context.fetch(descriptor)
+    }
+
     // MARK: Changing
 
     /// Adds a task. The category is guessed from the title unless one is given.

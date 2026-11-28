@@ -23,6 +23,10 @@ jobs:
     env:
       XCODE_VERSION: "26.6"
       XCODEGEN_VERSION: "2.48.0"
+      # Plan A for widgets (docs/widgets-shared-folder.md): record an App Group request in the IPA so
+      # SideStore can grant the app and widget a shared folder. "false" drops the request (plan B:
+      # widgets stay in basic mode). The app and widgets run safely either way.
+      REQUEST_APP_GROUP: "true"
     defaults:
       run:
         shell: bash -euo pipefail {0}
@@ -80,6 +84,28 @@ jobs:
           fi
           echo "No build warnings."
 
+      # Ad-hoc signing needs no certificate, team or account: it only writes the entitlement request
+      # into the binaries. SideStore re-signs everything with the owner's Apple ID at install time.
+      # Inner bundles first, then the app.
+      - name: Request shared folder (ad-hoc sign with App Group)
+        if: env.REQUEST_APP_GROUP == 'true'
+        run: |
+          APP="$RUNNER_TEMP/DailyFlow.xcarchive/Products/Applications/DailyFlow.app"
+          WIDGET="$APP/PlugIns/DailyFlowWidget.appex"
+          codesign --force --sign - --timestamp=none "$APP/Frameworks/DailyFlowCore.framework"
+          codesign --force --sign - --timestamp=none --generate-entitlement-der \
+            --entitlements Signing/DailyFlowWidget.entitlements "$WIDGET"
+          codesign --force --sign - --timestamp=none --generate-entitlement-der \
+            --entitlements Signing/DailyFlow.entitlements "$APP"
+          for bundle in "$APP" "$WIDGET"; do
+            if ! codesign -d --entitlements - --xml "$bundle" 2>/dev/null | grep -q "group.com.example.dailyflow"; then
+              echo "::error::App Group request missing from $(basename "$bundle")"
+              exit 1
+            fi
+          done
+          codesign --verify --deep --strict "$APP"
+          echo "App Group requested by DailyFlow.app and DailyFlowWidget.appex."
+
       - name: Package IPA
         run: |
           APP="$RUNNER_TEMP/DailyFlow.xcarchive/Products/Applications/DailyFlow.app"
@@ -119,6 +145,7 @@ jobs:
             echo "- Build number: ${BUILD}"
             echo "- IPA size: ${SIZE}"
             echo "- Commit: ${GITHUB_SHA::7}"
+            echo "- Shared folder (App Group) requested: ${REQUEST_APP_GROUP}"
           } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Upload IPA artifact
@@ -210,7 +237,8 @@ jobs:
           xcrun simctl status_bar "$UDID" override --time "10:15" --batteryState charged --batteryLevel 100 \
             --cellularBars 4 --wifiBars 3 || true
           xcrun simctl install "$UDID" "$APP"
-          for scene in day day-light list list-light sorted triage add view settings notice ring bar number; do
+          for scene in day day-light list list-light sorted triage add view settings notice ring bar number \
+            remind settings-off widgets widgets-light widgets-basic; do
             xcrun simctl terminate "$UDID" com.example.dailyflow 2>/dev/null || true
             xcrun simctl launch "$UDID" com.example.dailyflow -DFDemo YES -DFScene "$scene"
             sleep 6
