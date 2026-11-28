@@ -163,16 +163,14 @@ private struct BasicScene: View {
                 Text("BASIC MODE \u{00B7} NO TASK DATA")
                     .dfStyle(.overline)
                     .foregroundStyle(palette.inkSecondary)
-                HStack(alignment: .top, spacing: 21) {
+                HStack(alignment: .center, spacing: 21) {
                     GalleryWidget(kind: .progressRing, family: .systemSmall, mode: .fullColor, entry: entry,
                                   caption: "systemSmall \u{00B7} progressRing", wallpaper: palette)
-                    VStack(spacing: 14) {
-                        GalleryWidget(kind: .upNext, family: .accessoryRectangular, mode: .vibrant, entry: entry,
-                                      caption: "accessoryRectangular \u{00B7} upNext", wallpaper: palette)
-                        GalleryWidget(kind: .todayLine, family: .accessoryInline, mode: .vibrant, entry: entry,
-                                      caption: "accessoryInline \u{00B7} todayLine", wallpaper: palette)
-                    }
+                    GalleryWidget(kind: .upNext, family: .accessoryRectangular, mode: .vibrant, entry: entry,
+                                  caption: "accessoryRectangular \u{00B7} upNext", wallpaper: palette)
                 }
+                GalleryWidget(kind: .todayLine, family: .accessoryInline, mode: .vibrant, entry: entry,
+                              caption: "accessoryInline \u{00B7} todayLine", wallpaper: palette)
                 GalleryWidget(kind: .wave, family: .systemMedium, mode: .fullColor, entry: entry,
                               caption: "systemMedium \u{00B7} wave", wallpaper: palette)
                 GalleryWidget(kind: .dayDial, family: .systemMedium, mode: .fullColor, entry: entry,
@@ -265,7 +263,9 @@ private struct GalleryWidget: View {
                 .dfStyle(.micro)
                 .foregroundStyle(wallpaper.inkSecondary)
                 .lineLimit(1)
-                .minimumScaleFactor(0.7)
+                .minimumScaleFactor(0.6)
+                // Never wider than the widget, so a long caption cannot push the row off screen.
+                .frame(width: size.width)
         }
     }
 }

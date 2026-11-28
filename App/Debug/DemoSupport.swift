@@ -104,17 +104,26 @@ enum DemoSupport {
 
     private static func present(_ scene: String, on model: AppModel) {
         switch scene {
-        case "triage": model.sheet = .triage
-        case "add": model.sheet = .add
-        case "settings": model.sheet = .settings
+        case "triage": presentSheet(.triage, on: model)
+        case "add": presentSheet(.add, on: model)
+        case "settings": presentSheet(.settings, on: model)
         case "view": model.showsViewSwitcher = true
         case "notice": model.setPreview(.nextNotice)
         case "widgets", "widgets-light", "widgets-lock", "widgets-basic": gallery = scene
         case "remind": model.showDemoReminders(.notAsked)
         case "settings-off":
             model.showDemoReminders(.denied)
-            model.sheet = .settings
+            presentSheet(.settings, on: model)
         default: break
+        }
+    }
+
+    /// Opens a sheet shortly after launch, the way a tap would. A sheet requested while the app is still
+    /// launching (before its window exists) is silently dropped by SwiftUI.
+    private static func presentSheet(_ sheet: AppSheet, on model: AppModel) {
+        Task { @MainActor in
+            try? await Task.sleep(for: .milliseconds(800))
+            model.sheet = sheet
         }
     }
 }

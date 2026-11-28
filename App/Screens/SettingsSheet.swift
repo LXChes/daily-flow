@@ -26,6 +26,9 @@ struct SettingsSheet: View {
 
             ScrollView {
                 VStack(alignment: .leading, spacing: 0) {
+                    if let status = reminderStatus {
+                        section("REMINDERS") { statusRow(status) }
+                    }
                     noticeSection
                     morningSection
                     urgentSection
@@ -75,10 +78,6 @@ struct SettingsSheet: View {
 
     private var morningSection: some View {
         section("MORNINGS") {
-            if let status = reminderStatus {
-                statusRow(status)
-                RowDivider()
-            }
             SwitchRow(
                 title: "Morning brief",
                 subtitle: "A gentle notification with your day ahead",
