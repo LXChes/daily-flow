@@ -97,6 +97,7 @@ struct DFWidgetContainer: View {
     }
 }
 
+@MainActor
 private func configuration(_ kind: DFWidgetKind) -> some WidgetConfiguration {
     AppIntentConfiguration(kind: kind.rawValue, intent: DFStyleIntent.self, provider: DFProvider()) { entry in
         DFWidgetContainer(kind: kind, entry: entry)
