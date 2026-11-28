@@ -21,6 +21,9 @@ enum DemoSupport {
     /// Set for the watch scenes: the main screen scrolls the watch into view after launch.
     static var revealsWatch = false
 
+    /// True once a demo model has been made: the 3D watch then renders a fixed still (fixed tilt, time zero).
+    static var isActive = false
+
     private struct Seed {
         let title: String
         var start: Int?
@@ -49,6 +52,7 @@ enum DemoSupport {
 
             let model = AppModel(container: container, isTemporaryStore: false, clock: .fixed(now, calendar: calendar))
             present(scene, on: model)
+            isActive = true
             return model
         } catch {
             logger.error("Demo setup failed: \(error.localizedDescription, privacy: .public)")

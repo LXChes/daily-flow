@@ -4,15 +4,21 @@ import SwiftUI
 /// Layout "Watch": the day as a skeleton watch. Every task is a gear that turns, timed tasks are arcs on
 /// the 24 hour bezel, an arrow hand points at now. Tap a gear to see its task under the watch and tick it.
 ///
-/// The watch is four stacked canvases so only what moves is redrawn each frame:
-/// back (case, strap, plate: redrawn only on a theme or size change), movement (wheels, balance, bridges,
-/// every frame), front (rings, arcs, hands: every couple of seconds) and glass (seconds hand, glint).
+/// The watch is a real 3D skeleton watch (Metal: `Watch3DView`) when the device can run it. If Metal is not
+/// available, or its setup fails, the 2D watch stays as the fallback: four stacked canvases so only what
+/// moves is redrawn each frame: back (case, strap, plate: redrawn only on a theme or size change), movement
+/// (wheels, balance, bridges, every frame), front (rings, arcs, hands: every couple of seconds) and glass
+/// (seconds hand, glint).
 struct WatchSection: View {
     @Environment(AppModel.self) private var model
+    @Environment(\.palette) private var palette
+    @Environment(\.scenePhase) private var scenePhase
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     /// The gear the owner tapped. Ignored once that task is no longer on the watch.
     @State private var tappedID: UUID?
+    /// Set when the 3D watch could not start: the 2D watch takes over.
+    @State private var threeDFailed = false
 
     var body: some View {
         // The clock the static parts hang on: every couple of seconds, or once a minute with Reduce Motion.
@@ -32,15 +38,34 @@ struct WatchSection: View {
                 selected: selection,
                 showsHardware: true
             )
+            let summary = WatchGeometry.spokenSummary(model.items, titles: { $0.title }, atMinute: minute)
             VStack(spacing: 14) {
-                WatchStageView(
-                    frame: frame,
-                    summary: WatchGeometry.spokenSummary(model.items, titles: { $0.title }, atMinute: minute),
-                    reduceMotion: reduceMotion,
-                    label: { gear in spokenLabel(for: gear) },
-                    isSelected: { id in id == selection },
-                    select: { id in select(id) }
-                )
+                if Watch3D.isSupported, !threeDFailed {
+                    Watch3DStageView(
+                        input: WatchRenderInput(
+                            frame: frame,
+                            clock: model.clock,
+                            background: WatchRenderInput.linearColor(palette.background),
+                            reduceMotion: reduceMotion,
+                            isDemo: WatchSection.isDemo
+                        ),
+                        isActive: scenePhase == .active,
+                        summary: summary,
+                        label: { gear in spokenLabel(for: gear) },
+                        isSelected: { id in id == selection },
+                        select: { id in select(id) },
+                        onFailure: { threeDFailed = true }
+                    )
+                } else {
+                    WatchStageView(
+                        frame: frame,
+                        summary: summary,
+                        reduceMotion: reduceMotion,
+                        label: { gear in spokenLabel(for: gear) },
+                        isSelected: { id in id == selection },
+                        select: { id in select(id) }
+                    )
+                }
                 WatchNowLine(minute: minute)
                     .padding(.horizontal, Metrics.gutter)
                 WatchTaskCard(item: model.items.first(where: { $0.id == selection }), minute: minute)
@@ -54,6 +79,15 @@ struct WatchSection: View {
 
     /// The pulse of an urgent jewel when nothing animates.
     static let restingPulse = 0.85
+
+    /// The fixed-clock screenshot mode (DEBUG builds only): the 3D watch draws a deterministic still.
+    @MainActor private static var isDemo: Bool {
+        #if DEBUG
+        DemoSupport.isActive
+        #else
+        false
+        #endif
+    }
 
     // MARK: Selection
 
@@ -83,6 +117,47 @@ struct WatchSection: View {
 }
 
 // MARK: The watch
+
+/// The 3D watch with the same strap fade and the same VoiceOver as the 2D one: one element speaking the day, and
+/// a button per gear inside it.
+private struct Watch3DStageView: View {
+    let input: WatchRenderInput
+    let isActive: Bool
+    let summary: String
+    let label: (WatchGear) -> String
+    let isSelected: (UUID) -> Bool
+    let select: (UUID) -> Void
+    let onFailure: @MainActor () -> Void
+
+    @Environment(\.palette) private var palette
+
+    var body: some View {
+        Watch3DView(input: input, isActive: isActive, onSelect: select, onFailure: onFailure)
+            .aspectRatio(360.0 / 440.0, contentMode: .fit)
+            .accessibilityLabel(summary)
+            .accessibilityChildren {
+                VStack {
+                    ForEach(input.frame.gears) { gear in
+                        Button(label(gear)) { select(gear.taskID) }
+                            .accessibilityAddTraits(isSelected(gear.taskID) ? .isSelected : [])
+                    }
+                }
+            }
+            // The strap runs off the top and bottom of the picture: fade it into the screen.
+            .mask {
+                LinearGradient(
+                    stops: [
+                        .init(color: palette.background.opacity(0), location: 0),
+                        .init(color: palette.background, location: 0.1),
+                        .init(color: palette.background, location: 0.9),
+                        .init(color: palette.background.opacity(0), location: 1)
+                    ],
+                    startPoint: .top,
+                    endPoint: .bottom
+                )
+            }
+    }
+}
 
 /// The four layers plus tapping and VoiceOver.
 private struct WatchStageView: View {

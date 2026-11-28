@@ -1,5 +1,6 @@
 import DailyFlowCore
 import SwiftUI
+import simd
 
 // The watch's one token file: every colour the skeleton watch draws comes from here, for both themes.
 // Dark is a gunmetal case with a black ceramic bezel, faceted chrome hands and cyan lume. Light is a gold
@@ -250,5 +251,190 @@ extension WatchPalette {
         leatherLight: Color(hex: 0x8A5530),
         stitch: Color(hex: 0xE9D5AC),
         accessoryInk: Color(hex: 0xFFFFFF)
+    )
+}
+
+// MARK: - Material tokens for the 3D watch
+
+private extension SIMD3 where Scalar == Float {
+    /// Linear-light colour from a 0xRRGGBB sRGB literal, ready for a physically based shader.
+    /// Only this file may use it.
+    init(hex: UInt32) {
+        func linear(_ shift: UInt32) -> Float {
+            let c = Float((hex >> shift) & 0xFF) / 255
+            return c <= 0.04045 ? c / 12.92 : Float(pow(Double((c + 0.055) / 1.055), 2.4))
+        }
+        self.init(linear(16), linear(8), linear(0))
+    }
+}
+
+/// What the 3D watch's materials are made of, for both themes. Colours are linear light; `metallic` and
+/// `roughness` are the usual PBR knobs. The printed layers (bezel numerals, hour ring, task arcs) are not here:
+/// they are drawn by the 2D painter from `WatchPalette` and mapped on as a texture.
+struct WatchMaterialTokens: Sendable {
+    struct Surface: Sendable {
+        var color: SIMD3<Float>
+        var metallic: Float
+        var roughness: Float
+        var clearcoat: Float = 0
+    }
+
+    // Studio: the procedural room the metal reflects, and the key light with the shadow.
+    let envTint: SIMD3<Float>
+    let envGain: Float
+    let keyColor: SIMD3<Float>
+    let keyGain: Float
+    /// How dark the "curtain" behind the viewer is: polished faces read as black mirrors with highlights.
+    let curtain: Float
+    let exposure: Float
+    let bloom: Float
+
+    // Case, bezel, crystal.
+    let caseMetal: Surface
+    let bezelBody: Surface
+    let ringBody: Surface
+    let ringWall: Surface
+    let crystalTint: SIMD3<Float>
+
+    // Movement.
+    let plate: Surface
+    let wheel: Surface
+    let wheelPlain: Surface
+    let wheelDone: Surface
+    let barrel: Surface
+    let mainspring: Surface
+    let bridge: Surface
+    let bridgeBevel: SIMD3<Float>
+    let screw: Surface
+    let screwSlot: Surface
+    let chaton: Surface
+    let hairspring: Surface
+    let balance: Surface
+    let fork: Surface
+
+    // Jewels and glows.
+    let ruby: SIMD3<Float>
+    let rubyGlow: SIMD3<Float>
+    let doneGlow: SIMD3<Float>
+    let selection: SIMD3<Float>
+
+    // Hands.
+    let hand: Surface
+    let lume: SIMD3<Float>
+    let lumeGain: Float
+    let dayArrow: Surface
+    let dayArrowGlow: Float
+    let seconds: Surface
+    let secondsTip: SIMD3<Float>
+    let cap: Surface
+    let capDot: Surface
+
+    // Strap and bracelet.
+    let leather: Surface
+    let braceletSatin: Surface
+    let braceletPolished: Surface
+}
+
+extension WatchPalette {
+    var materials: WatchMaterialTokens { isDark ? .dark : .light }
+}
+
+extension WatchMaterialTokens {
+    private static func surface(
+        _ hex: UInt32, _ metallic: Float, _ roughness: Float, coat: Float = 0
+    ) -> Surface {
+        Surface(color: SIMD3<Float>(hex: hex), metallic: metallic, roughness: roughness, clearcoat: coat)
+    }
+
+    /// Gunmetal case, black ceramic bezel, chrome hands with cyan lume.
+    static let dark = WatchMaterialTokens(
+        envTint: SIMD3<Float>(0.92, 0.97, 1.08),
+        envGain: 1,
+        keyColor: SIMD3<Float>(1.0, 0.97, 0.93),
+        keyGain: 3.4,
+        curtain: 0.4,
+        exposure: 1.25,
+        bloom: 0.55,
+        caseMetal: surface(0x6A717B, 1, 0.17),
+        bezelBody: surface(0x0B0C0F, 0, 0.34, coat: 1),
+        ringBody: surface(0x07080A, 0, 0.42, coat: 0.7),
+        ringWall: surface(0x8C95A0, 1, 0.2),
+        crystalTint: SIMD3<Float>(hex: 0xC9D8FF),
+        plate: surface(0x4A525C, 1, 0.45),
+        wheel: surface(0x929BA6, 1, 0.24),
+        wheelPlain: surface(0x6C747E, 1, 0.34),
+        wheelDone: surface(0xE2ECF6, 1, 0.045),
+        barrel: surface(0x555C66, 1, 0.3),
+        mainspring: surface(0x8C95A0, 1, 0.22),
+        bridge: surface(0x7A818B, 1, 0.3),
+        bridgeBevel: SIMD3<Float>(hex: 0xE1E6EC),
+        screw: surface(0xC9D0D8, 1, 0.12),
+        screwSlot: surface(0x0A0B0D, 0, 0.6),
+        chaton: surface(0xB8C0C9, 1, 0.1),
+        hairspring: surface(0xEEF3F8, 1, 0.14),
+        balance: surface(0xA8B0BA, 1, 0.16),
+        fork: surface(0x9AA3AE, 1, 0.2),
+        ruby: SIMD3<Float>(hex: 0xC8102F),
+        rubyGlow: SIMD3<Float>(hex: 0xFF9FB0),
+        doneGlow: SIMD3<Float>(hex: 0xA8F0FF),
+        selection: SIMD3<Float>(hex: 0xA8F0FF),
+        hand: surface(0xE4E9EF, 1, 0.07),
+        lume: SIMD3<Float>(hex: 0xA8F0FF),
+        lumeGain: 2.6,
+        dayArrow: surface(0xA78BFA, 0.3, 0.34),
+        dayArrowGlow: 0.55,
+        seconds: surface(0xE8EDF2, 1, 0.1),
+        secondsTip: SIMD3<Float>(hex: 0xFF4D5E),
+        cap: surface(0xD9DEE4, 1, 0.08),
+        capDot: surface(0xA78BFA, 0.4, 0.3),
+        leather: surface(0x16191D, 0, 0.6),
+        braceletSatin: surface(0x6A717B, 1, 0.4),
+        braceletPolished: surface(0xB6BDC6, 1, 0.1)
+    )
+
+    /// Yellow gold case, ivory Roman ring, blued steel hands, leather strap.
+    static let light = WatchMaterialTokens(
+        envTint: SIMD3<Float>(1.08, 1.0, 0.86),
+        envGain: 1,
+        keyColor: SIMD3<Float>(1.0, 0.95, 0.86),
+        keyGain: 3.0,
+        curtain: 0.2,
+        exposure: 1.05,
+        bloom: 0.3,
+        caseMetal: surface(0xE8BE58, 1, 0.16),
+        bezelBody: surface(0xE6D5AE, 0, 0.4, coat: 0.55),
+        ringBody: surface(0xE4D3AC, 0, 0.45, coat: 0.4),
+        ringWall: surface(0xDDB766, 1, 0.2),
+        crystalTint: SIMD3<Float>(hex: 0xFFF1D0),
+        plate: surface(0xB98F3E, 1, 0.4),
+        wheel: surface(0xE0B24C, 1, 0.24),
+        wheelPlain: surface(0xB88B3A, 1, 0.34),
+        wheelDone: surface(0xFFE7B0, 1, 0.045),
+        barrel: surface(0x9A7431, 1, 0.3),
+        mainspring: surface(0x6A5530, 1, 0.24),
+        bridge: surface(0xCDA554, 1, 0.3),
+        bridgeBevel: SIMD3<Float>(hex: 0xFFF8DF),
+        screw: surface(0x2B4E9E, 1, 0.14),
+        screwSlot: surface(0x10162A, 0, 0.6),
+        chaton: surface(0xE8D196, 1, 0.1),
+        hairspring: surface(0x2B4E9E, 1, 0.14),
+        balance: surface(0xDDB766, 1, 0.16),
+        fork: surface(0xCDA554, 1, 0.2),
+        ruby: SIMD3<Float>(hex: 0xC8102F),
+        rubyGlow: SIMD3<Float>(hex: 0xFF9FB0),
+        doneGlow: SIMD3<Float>(hex: 0xFFE08A),
+        selection: SIMD3<Float>(hex: 0xFF4D6A),
+        hand: surface(0x2A4690, 1, 0.1),
+        lume: SIMD3<Float>(hex: 0x3D6AD0),
+        lumeGain: 0,
+        dayArrow: surface(0x8E1B2A, 0.3, 0.34),
+        dayArrowGlow: 0,
+        seconds: surface(0x1E3A7A, 1, 0.12),
+        secondsTip: SIMD3<Float>(hex: 0x1E3A7A),
+        cap: surface(0xE9CF86, 1, 0.08),
+        capDot: surface(0x1E3A7A, 0.6, 0.2),
+        leather: surface(0x4A2814, 0, 0.55),
+        braceletSatin: surface(0xDDB766, 1, 0.38),
+        braceletPolished: surface(0xF5DC96, 1, 0.1)
     )
 }
