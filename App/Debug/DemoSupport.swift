@@ -8,7 +8,7 @@ import SwiftData
 ///
 /// `-DFDemo YES` opens an in-memory store seeded with neutral demo tasks and a fixed clock of 10:15 on a
 /// fixed day. `-DFScene <name>` then opens a particular state straight away:
-/// day, day-light, list, list-light, sorted, triage, add, view, settings, notice, ring, bar, number, and the
+/// day, day-light, list, list-light, watch, watch-light, sorted, triage, add, view, settings, notice, ring, bar, number, and the
 /// widget gallery scenes widgets, widgets-light, widgets-lock, widgets-basic.
 @MainActor
 enum DemoSupport {
@@ -92,6 +92,10 @@ enum DemoSupport {
         case "list": settings.layout = .list
         case "list-light":
             settings.layout = .list
+            settings.theme = .light
+        case "watch": settings.layout = .watch
+        case "watch-light":
+            settings.layout = .watch
             settings.theme = .light
         case "sorted": settings.categoryMode = .sorted
         case "ring": settings.progressStyle = .ring

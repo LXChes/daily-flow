@@ -237,7 +237,7 @@ jobs:
           xcrun simctl status_bar "$UDID" override --time "10:15" --batteryState charged --batteryLevel 100 \
             --cellularBars 4 --wifiBars 3 || true
           xcrun simctl install "$UDID" "$APP"
-          for scene in day day-light list list-light sorted triage add view settings notice ring bar number \
+          for scene in day day-light list list-light watch watch-light sorted triage add view settings notice ring bar number \
             remind settings-off widgets widgets-light widgets-lock widgets-basic; do
             xcrun simctl terminate "$UDID" com.example.dailyflow 2>/dev/null || true
             xcrun simctl launch "$UDID" com.example.dailyflow -DFDemo YES -DFScene "$scene"

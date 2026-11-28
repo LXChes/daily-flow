@@ -107,8 +107,7 @@ final class AppModel {
     var theme: ThemeMode { settings.theme }
     var palette: Palette { Palette.for(settings.theme) }
 
-    /// Watch arrives in M5; until then a stored `.watch` behaves as Play the day.
-    var layout: LayoutMode { settings.layout == .list ? .list : .playTheDay }
+    var layout: LayoutMode { settings.layout }
     var isSorted: Bool { settings.categoryMode == .sorted }
 
     var activeNotices: [NoticeOccurrence] {

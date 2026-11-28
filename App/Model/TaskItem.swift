@@ -34,3 +34,6 @@ struct TaskItem: Identifiable, Equatable, Sendable, ScheduledItem {
         return Fmt.span(start: startMinute, duration: durationMinutes)
     }
 }
+
+/// The watch reads tasks through the same pure rules as the widgets.
+extension TaskItem: WatchItem {}

@@ -68,7 +68,7 @@ private struct ViewSwitcherCard: View {
         VStack(alignment: .leading, spacing: 14) {
             group("Layout") {
                 ChipGroup(
-                    values: [LayoutMode.playTheDay, LayoutMode.list],
+                    values: LayoutMode.allCases,
                     label: { $0.title },
                     selection: model.layout
                 ) { value in
